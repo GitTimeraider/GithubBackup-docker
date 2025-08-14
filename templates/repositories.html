@@ -42,7 +42,13 @@
                     </div>
                     <div class="col-4">
                         <div class="border-end">
-                            <div class="text-info">{{ repo.schedule_type.title() }}</div>
+                            <div class="text-info">
+                                {% if repo.schedule_type == 'custom' %}
+                                    Every {{ repo.custom_interval }} {{ repo.custom_unit }}
+                                {% else %}
+                                    {{ repo.schedule_type.title() }}
+                                {% endif %}
+                            </div>
                             <small class="text-muted">Schedule</small>
                         </div>
                     </div>

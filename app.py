@@ -202,6 +202,44 @@ def add_repository():
         schedule_type = request.form['schedule_type']
         retention_count = int(request.form['retention_count'])
         
+        # Handle custom schedule fields
+        custom_interval = None
+        custom_unit = None
+        custom_hour = 2
+        custom_minute = 0
+        
+        if schedule_type == 'custom':
+            custom_interval = int(request.form.get('custom_interval', 1))
+            custom_unit = request.form.get('custom_unit', 'days')
+            custom_time = request.form.get('custom_time', '02:00')
+            
+            # Validate custom schedule parameters
+            if custom_unit == 'days' and (custom_interval < 1 or custom_interval > 365):
+                flash('Custom interval for days must be between 1 and 365', 'error')
+                return render_template('add_repository.html')
+            elif custom_unit == 'weeks' and (custom_interval < 1 or custom_interval > 52):
+                flash('Custom interval for weeks must be between 1 and 52', 'error')
+                return render_template('add_repository.html')
+            elif custom_unit == 'months' and (custom_interval < 1 or custom_interval > 12):
+                flash('Custom interval for months must be between 1 and 12', 'error')
+                return render_template('add_repository.html')
+            
+            try:
+                time_parts = custom_time.split(':')
+                custom_hour = int(time_parts[0])
+                custom_minute = int(time_parts[1])
+                
+                if custom_hour < 0 or custom_hour > 23:
+                    flash('Hour must be between 0 and 23', 'error')
+                    return render_template('add_repository.html')
+                if custom_minute < 0 or custom_minute > 59:
+                    flash('Minute must be between 0 and 59', 'error')
+                    return render_template('add_repository.html')
+                    
+            except (IndexError, ValueError):
+                flash('Invalid time format. Please use HH:MM format', 'error')
+                return render_template('add_repository.html')
+        
         # Extract repo name from URL
         repo_name = repo_url.split('/')[-1].replace('.git', '')
         
@@ -213,6 +251,10 @@ def add_repository():
             backup_format=backup_format,
             schedule_type=schedule_type,
             retention_count=retention_count,
+            custom_interval=custom_interval,
+            custom_unit=custom_unit,
+            custom_hour=custom_hour,
+            custom_minute=custom_minute,
             is_active=True
         )
         
@@ -239,10 +281,56 @@ def edit_repository(repo_id):
         repository.retention_count = int(request.form['retention_count'])
         repository.is_active = 'is_active' in request.form
         
+        # Handle custom schedule fields
+        if repository.schedule_type == 'custom':
+            custom_interval = int(request.form.get('custom_interval', 1))
+            custom_unit = request.form.get('custom_unit', 'days')
+            custom_time = request.form.get('custom_time', '02:00')
+            
+            # Validate custom schedule parameters
+            if custom_unit == 'days' and (custom_interval < 1 or custom_interval > 365):
+                flash('Custom interval for days must be between 1 and 365', 'error')
+                return render_template('edit_repository.html', repository=repository)
+            elif custom_unit == 'weeks' and (custom_interval < 1 or custom_interval > 52):
+                flash('Custom interval for weeks must be between 1 and 52', 'error')
+                return render_template('edit_repository.html', repository=repository)
+            elif custom_unit == 'months' and (custom_interval < 1 or custom_interval > 12):
+                flash('Custom interval for months must be between 1 and 12', 'error')
+                return render_template('edit_repository.html', repository=repository)
+            
+            repository.custom_interval = custom_interval
+            repository.custom_unit = custom_unit
+            
+            try:
+                time_parts = custom_time.split(':')
+                repository.custom_hour = int(time_parts[0])
+                repository.custom_minute = int(time_parts[1])
+                
+                if repository.custom_hour < 0 or repository.custom_hour > 23:
+                    flash('Hour must be between 0 and 23', 'error')
+                    return render_template('edit_repository.html', repository=repository)
+                if repository.custom_minute < 0 or repository.custom_minute > 59:
+                    flash('Minute must be between 0 and 59', 'error')
+                    return render_template('edit_repository.html', repository=repository)
+                    
+            except (IndexError, ValueError):
+                flash('Invalid time format. Please use HH:MM format', 'error')
+                return render_template('edit_repository.html', repository=repository)
+        else:
+            # Reset custom fields when not using custom schedule
+            repository.custom_interval = None
+            repository.custom_unit = None
+            repository.custom_hour = 2
+            repository.custom_minute = 0
+        
         db.session.commit()
         
         # Reschedule the backup job
-        scheduler.remove_job(f'backup_{repo_id}', jobstore=None)
+        try:
+            scheduler.remove_job(f'backup_{repo_id}', jobstore=None)
+        except:
+            pass
+        
         if repository.is_active:
             schedule_backup_job(repository)
         
@@ -315,6 +403,61 @@ def schedule_backup_job(repository):
         trigger = CronTrigger(day_of_week=0, hour=2, minute=0)  # Sunday 2 AM
     elif repository.schedule_type == 'monthly':
         trigger = CronTrigger(day=1, hour=2, minute=0)  # 1st of month 2 AM
+    elif repository.schedule_type == 'custom':
+        # Handle custom schedule
+        hour = repository.custom_hour or 2
+        minute = repository.custom_minute or 0
+        interval = repository.custom_interval or 1
+        unit = repository.custom_unit or 'days'
+        
+        if unit == 'days':
+            # For daily intervals, use interval_trigger if more than 1 day
+            if interval == 1:
+                trigger = CronTrigger(hour=hour, minute=minute)  # Daily
+            else:
+                # Use interval trigger for multi-day schedules
+                from apscheduler.triggers.interval import IntervalTrigger
+                from datetime import datetime, time
+                # Calculate next run time at the specified hour/minute
+                now = datetime.now()
+                start_date = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                if start_date <= now:
+                    start_date = start_date.replace(day=start_date.day + 1)
+                trigger = IntervalTrigger(days=interval, start_date=start_date)
+        elif unit == 'weeks':
+            # For weekly intervals
+            if interval == 1:
+                trigger = CronTrigger(day_of_week=0, hour=hour, minute=minute)  # Every Sunday
+            else:
+                from apscheduler.triggers.interval import IntervalTrigger
+                from datetime import datetime
+                now = datetime.now()
+                start_date = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                # Find next Sunday
+                days_until_sunday = (6 - now.weekday()) % 7
+                if days_until_sunday == 0 and start_date <= now:
+                    days_until_sunday = 7
+                start_date = start_date.replace(day=start_date.day + days_until_sunday)
+                trigger = IntervalTrigger(weeks=interval, start_date=start_date)
+        elif unit == 'months':
+            # For monthly intervals
+            if interval == 1:
+                trigger = CronTrigger(day=1, hour=hour, minute=minute)  # 1st of every month
+            else:
+                from apscheduler.triggers.interval import IntervalTrigger
+                from datetime import datetime
+                now = datetime.now()
+                start_date = now.replace(day=1, hour=hour, minute=minute, second=0, microsecond=0)
+                if start_date <= now:
+                    # Move to next month
+                    if start_date.month == 12:
+                        start_date = start_date.replace(year=start_date.year + 1, month=1)
+                    else:
+                        start_date = start_date.replace(month=start_date.month + 1)
+                # Note: Using weeks approximation for months since APScheduler doesn't have months interval
+                trigger = IntervalTrigger(weeks=interval*4, start_date=start_date)
+        else:
+            return  # Invalid unit
     else:
         return  # Manual only
     

@@ -90,7 +90,11 @@
                             <strong>{{ repo.name }}</strong>
                             <br>
                             <small class="text-muted">
-                                {{ repo.schedule_type.title() }} backup
+                                {% if repo.schedule_type == 'custom' %}
+                                    Every {{ repo.custom_interval }} {{ repo.custom_unit }} backup
+                                {% else %}
+                                    {{ repo.schedule_type.title() }} backup
+                                {% endif %}
                                 {% if repo.last_backup %}
                                     - Last: {{ repo.last_backup.strftime('%Y-%m-%d %H:%M') }}
                                 {% endif %}

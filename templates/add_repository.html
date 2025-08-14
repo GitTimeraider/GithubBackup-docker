@@ -47,12 +47,13 @@
                         
                         <div class="col-md-6 mb-3">
                             <label for="schedule_type" class="form-label">Backup Schedule <span class="text-danger">*</span></label>
-                            <select class="form-select" id="schedule_type" name="schedule_type" required>
+                            <select class="form-select" id="schedule_type" name="schedule_type" required onchange="toggleCustomSchedule()">
                                 <option value="manual">Manual Only</option>
                                 <option value="hourly">Every Hour</option>
                                 <option value="daily" selected>Daily (2 AM)</option>
                                 <option value="weekly">Weekly (Sunday 2 AM)</option>
                                 <option value="monthly">Monthly (1st, 2 AM)</option>
+                                <option value="custom">Custom Schedule</option>
                             </select>
                             <div class="form-text">
                                 When to automatically backup this repository
@@ -60,7 +61,35 @@
                         </div>
                     </div>
                     
-                    <div class="mb-3">
+                    <!-- Custom Schedule Options -->
+                    <div id="custom-schedule-options" class="row" style="display: none;">
+                        <div class="col-md-4 mb-3">
+                            <label for="custom_interval" class="form-label">Every</label>
+                            <input type="number" class="form-control" id="custom_interval" name="custom_interval" 
+                                   min="1" max="365" value="1">
+                            <div class="form-text">
+                                <span id="interval-help">Enter a number between 1-365</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="custom_unit" class="form-label">Unit</label>
+                            <select class="form-select" id="custom_unit" name="custom_unit" onchange="updateIntervalLimits()">
+                                <option value="days">Days</option>
+                                <option value="weeks">Weeks</option>
+                                <option value="months">Months</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="custom_time" class="form-label">At Time</label>
+                            <input type="time" class="form-control" id="custom_time" name="custom_time" value="02:00">
+                            <div class="form-text">
+                                Time to run the backup (24-hour format)
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12 mb-3">
                         <label for="retention_count" class="form-label">Retention Count <span class="text-danger">*</span></label>
                         <input type="number" class="form-control" id="retention_count" name="retention_count" 
                                value="5" min="1" max="50" required>
@@ -97,6 +126,49 @@
 
 {% block scripts %}
 <script>
+function toggleCustomSchedule() {
+    const scheduleType = document.getElementById('schedule_type').value;
+    const customOptions = document.getElementById('custom-schedule-options');
+    
+    if (scheduleType === 'custom') {
+        customOptions.style.display = 'block';
+        // Make custom fields required when custom is selected
+        document.getElementById('custom_interval').required = true;
+        document.getElementById('custom_unit').required = true;
+        document.getElementById('custom_time').required = true;
+        updateIntervalLimits();
+    } else {
+        customOptions.style.display = 'none';
+        // Remove required attribute when custom is not selected
+        document.getElementById('custom_interval').required = false;
+        document.getElementById('custom_unit').required = false;
+        document.getElementById('custom_time').required = false;
+    }
+}
+
+function updateIntervalLimits() {
+    const unit = document.getElementById('custom_unit').value;
+    const intervalInput = document.getElementById('custom_interval');
+    const helpText = document.getElementById('interval-help');
+    
+    if (unit === 'days') {
+        intervalInput.max = 365;
+        helpText.textContent = 'Enter a number between 1-365';
+    } else if (unit === 'weeks') {
+        intervalInput.max = 52;
+        helpText.textContent = 'Enter a number between 1-52';
+        if (parseInt(intervalInput.value) > 52) {
+            intervalInput.value = 52;
+        }
+    } else if (unit === 'months') {
+        intervalInput.max = 12;
+        helpText.textContent = 'Enter a number between 1-12';
+        if (parseInt(intervalInput.value) > 12) {
+            intervalInput.value = 12;
+        }
+    }
+}
+
 document.getElementById('repo_url').addEventListener('blur', function() {
     const url = this.value;
     if (url && url.includes('github.com/')) {
@@ -107,6 +179,11 @@ document.getElementById('repo_url').addEventListener('blur', function() {
             console.log('Repository name extracted:', repoName);
         }
     }
+});
+
+// Initialize custom schedule toggle on page load
+document.addEventListener('DOMContentLoaded', function() {
+    toggleCustomSchedule();
 });
 </script>
 {% endblock %}

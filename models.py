@@ -21,8 +21,13 @@ class Repository(db.Model):
     url = db.Column(db.String(200), nullable=False)
     github_token = db.Column(db.String(200))  # For private repos
     backup_format = db.Column(db.String(20), default='folder')  # folder, zip, tar.gz
-    schedule_type = db.Column(db.String(20), default='daily')  # manual, hourly, daily, weekly, monthly
+    schedule_type = db.Column(db.String(20), default='daily')  # manual, hourly, daily, weekly, monthly, custom
     retention_count = db.Column(db.Integer, default=5)  # Number of backups to keep
+    # Custom schedule fields
+    custom_interval = db.Column(db.Integer)  # For custom schedule: interval value (e.g., 3 for "every 3 days")
+    custom_unit = db.Column(db.String(10))   # For custom schedule: unit (days, weeks, months)
+    custom_hour = db.Column(db.Integer, default=2)      # Hour to run backup (0-23)
+    custom_minute = db.Column(db.Integer, default=0)    # Minute to run backup (0-59)
     is_active = db.Column(db.Boolean, default=True)
     last_backup = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

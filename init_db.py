@@ -1,6 +1,7 @@
 import os
 from app import app
 from models import db
+from migrate_db import migrate_database
 
 def ensure_sqlite_path():
     uri = app.config.get('SQLALCHEMY_DATABASE_URI')
@@ -18,8 +19,13 @@ if __name__ == '__main__':
     db_file = ensure_sqlite_path()
     with app.app_context():
         try:
+            # Create tables if they don't exist
             db.create_all()
             print("Database initialized successfully!")
+            
+            # Run migration to add new columns if needed
+            migrate_database()
+            
             if db_file and os.path.exists(db_file):
                 st = os.stat(db_file)
                 print(f"Database file created: {db_file} (size {st.st_size} bytes, perms {oct(st.st_mode)[-3:]})")
