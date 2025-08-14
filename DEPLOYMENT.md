@@ -7,10 +7,14 @@ This project is automatically built and published to GitHub Container Registry (
 ### 1. Deploy with Docker Run
 
 ```bash
+# Get your user and group IDs
+USER_ID=$(id -u)
+GROUP_ID=$(id -g)
+
 # Create directories for persistent data
 mkdir -p ./data ./backups ./logs
 
-# Run the container
+# Run the container with proper user/group IDs
 docker run -d \
   --name github-backup \
   --restart unless-stopped \
@@ -19,6 +23,8 @@ docker run -d \
   -v $(pwd)/backups:/app/backups \
   -v $(pwd)/logs:/app/logs \
   -e SECRET_KEY="$(openssl rand -base64 32)" \
+  -e PUID=${USER_ID} \
+  -e PGID=${GROUP_ID} \
   ghcr.io/gittimeraider/githubbackup:latest
 ```
 
@@ -52,6 +58,9 @@ services:
 
 Then run:
 ```bash
+# Set your user/group IDs and secret key
+export PUID=$(id -u)
+export PGID=$(id -g)
 export SECRET_KEY=$(openssl rand -base64 32)
 docker-compose up -d
 ```
@@ -138,6 +147,10 @@ Create a `.env` file for environment variables:
 # Required: Change this in production
 SECRET_KEY=your-super-secret-key-here
 
+# User/Group IDs for proper file permissions
+PUID=1000  # Your user ID (run 'id -u' to get this)
+PGID=1000  # Your group ID (run 'id -g' to get this)
+
 # Optional: Database (defaults to SQLite)
 DATABASE_URL=sqlite:///data/github_backup.db
 
@@ -145,6 +158,33 @@ DATABASE_URL=sqlite:///data/github_backup.db
 FLASK_ENV=production
 LOG_LEVEL=INFO
 ```
+
+#### Understanding PUID and PGID
+
+The `PUID` (Process User ID) and `PGID` (Process Group ID) environment variables allow you to run the container with the same user and group IDs as your host system user. This ensures that:
+
+- Files created by the container have the correct ownership
+- You can read/write the mounted volumes without permission issues
+- Backups are accessible from the host system
+
+To find your IDs:
+```bash
+# Get your user ID
+id -u
+
+# Get your group ID  
+id -g
+
+# Get both at once
+id
+```
+
+**Example output:**
+```
+uid=1000(username) gid=1000(username) groups=1000(username),4(adm),24(cdrom)...
+```
+
+In this case, set `PUID=1000` and `PGID=1000`.
 
 ### 5. First Time Setup
 

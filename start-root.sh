@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Note: Running as non-root user, so we can't start system cron
-# Instead, we'll rely on APScheduler for job scheduling
+# Start cron daemon (requires root privileges)
+service cron start
 
 # Initialize database if it doesn't exist
 python init_db.py

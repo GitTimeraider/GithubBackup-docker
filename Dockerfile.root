@@ -6,9 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PUID=1000 \
-    PGID=1000
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -17,7 +15,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zip \
     unzip \
     cron \
-    gosu \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /tmp/* \
@@ -39,16 +36,7 @@ COPY . .
 
 # Create necessary directories and set permissions in one layer
 RUN mkdir -p /app/backups /app/logs /app/data && \
-    chmod +x start.sh && \
-    chmod +x entrypoint.sh
-
-# Create user with configurable UID/GID
-RUN groupadd -g ${PGID} appuser && \
-    useradd -u ${PUID} -g ${PGID} -m -s /bin/bash appuser && \
-    chown -R appuser:appuser /app
-
-# Switch back to root for entrypoint (needed for user/group modifications)
-USER root
+    chmod +x start.sh
 
 # Expose port
 EXPOSE 8080
@@ -57,6 +45,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
-# Set entrypoint and default command
-ENTRYPOINT ["/app/entrypoint.sh"]
+# Start the application
 CMD ["./start.sh"]
