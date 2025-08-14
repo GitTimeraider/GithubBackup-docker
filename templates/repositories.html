@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block page_title %}Repositories{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Repositories</h2>
+    <a href="{{ url_for('add_repository') }}" class="btn btn-primary">
+        <i class="fas fa-plus"></i> Add Repository
+    </a>
+</div>
+
+{% if repositories %}
+<div class="row">
+    {% for repo in repositories %}
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h5 class="card-title">
+                        <i class="fas fa-code-branch"></i> {{ repo.name }}
+                    </h5>
+                    <div>
+                        {% if repo.is_active %}
+                            <span class="badge bg-success">Active</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Inactive</span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <p class="card-text">
+                    <small class="text-muted">{{ repo.url }}</small>
+                </p>
+                
+                <div class="row text-center mb-3">
+                    <div class="col-4">
+                        <div class="border-end">
+                            <div class="text-primary">{{ repo.backup_format.upper() }}</div>
+                            <small class="text-muted">Format</small>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="border-end">
+                            <div class="text-info">{{ repo.schedule_type.title() }}</div>
+                            <small class="text-muted">Schedule</small>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div>
+                            <div class="text-warning">{{ repo.retention_count }}</div>
+                            <small class="text-muted">Retention</small>
+                        </div>
+                    </div>
+                </div>
+                
+                {% if repo.last_backup %}
+                <p class="card-text">
+                    <small class="text-muted">
+                        <i class="fas fa-clock"></i>
+                        Last backup: {{ repo.last_backup.strftime('%Y-%m-%d %H:%M') }}
+                    </small>
+                </p>
+                {% endif %}
+                
+                <div class="btn-group w-100" role="group">
+                    <form method="POST" action="{{ url_for('manual_backup', repo_id=repo.id) }}" class="flex-fill">
+                        <button type="submit" class="btn btn-success w-100" {% if not repo.is_active %}disabled{% endif %}>
+                            <i class="fas fa-play"></i> Backup Now
+                        </button>
+                    </form>
+                    <a href="{{ url_for('edit_repository', repo_id=repo.id) }}" class="btn btn-outline-primary">
+                        <i class="fas fa-edit"></i>
+                    </a>
+                    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ repo.id }}">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Delete Modal -->
+    <div class="modal fade" id="deleteModal{{ repo.id }}" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Delete</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    Are you sure you want to delete the repository <strong>{{ repo.name }}</strong>?
+                    This will also delete all associated backup jobs and schedules.
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form method="POST" action="{{ url_for('delete_repository', repo_id=repo.id) }}" class="d-inline">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center">
+    <div class="card">
+        <div class="card-body">
+            <i class="fas fa-inbox fa-5x text-muted mb-4"></i>
+            <h3 class="text-muted">No Repositories</h3>
+            <p class="text-muted">You haven't added any repositories yet.</p>
+            <a href="{{ url_for('add_repository') }}" class="btn btn-primary btn-lg">
+                <i class="fas fa-plus"></i> Add Your First Repository
+            </a>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block page_title %}Edit Repository{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-edit"></i> Edit Repository: {{ repository.name }}
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Repository URL</label>
+                        <input type="text" class="form-control" value="{{ repository.url }}" disabled>
+                        <div class="form-text">
+                            Repository URL cannot be changed. Delete and recreate if needed.
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="github_token" class="form-label">GitHub Token</label>
+                        <input type="password" class="form-control" id="github_token" name="github_token"
+                               value="{{ repository.github_token or '' }}"
+                               placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+                        <div class="form-text">
+                            <i class="fas fa-info-circle"></i>
+                            Required for private repositories. Leave empty for public repositories.
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="backup_format" class="form-label">Backup Format <span class="text-danger">*</span></label>
+                            <select class="form-select" id="backup_format" name="backup_format" required>
+                                <option value="folder" {% if repository.backup_format == 'folder' %}selected{% endif %}>Folder Structure</option>
+                                <option value="zip" {% if repository.backup_format == 'zip' %}selected{% endif %}>ZIP Archive</option>
+                                <option value="tar.gz" {% if repository.backup_format == 'tar.gz' %}selected{% endif %}>TAR.GZ Archive</option>
+                            </select>
+                            <div class="form-text">
+                                Choose how to store the backup files
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="schedule_type" class="form-label">Backup Schedule <span class="text-danger">*</span></label>
+                            <select class="form-select" id="schedule_type" name="schedule_type" required>
+                                <option value="manual" {% if repository.schedule_type == 'manual' %}selected{% endif %}>Manual Only</option>
+                                <option value="hourly" {% if repository.schedule_type == 'hourly' %}selected{% endif %}>Every Hour</option>
+                                <option value="daily" {% if repository.schedule_type == 'daily' %}selected{% endif %}>Daily (2 AM)</option>
+                                <option value="weekly" {% if repository.schedule_type == 'weekly' %}selected{% endif %}>Weekly (Sunday 2 AM)</option>
+                                <option value="monthly" {% if repository.schedule_type == 'monthly' %}selected{% endif %}>Monthly (1st, 2 AM)</option>
+                            </select>
+                            <div class="form-text">
+                                When to automatically backup this repository
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="retention_count" class="form-label">Retention Count <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="retention_count" name="retention_count" 
+                               value="{{ repository.retention_count }}" min="1" max="50" required>
+                        <div class="form-text">
+                            Number of backup versions to keep (older backups will be automatically deleted)
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="is_active" name="is_active" 
+                                   {% if repository.is_active %}checked{% endif %}>
+                            <label class="form-check-label" for="is_active">
+                                <strong>Active</strong>
+                            </label>
+                            <div class="form-text">
+                                Enable or disable automatic backups for this repository
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {% if repository.last_backup %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Last Backup:</strong> {{ repository.last_backup.strftime('%Y-%m-%d %H:%M:%S UTC') }}
+                    </div>
+                    {% endif %}
+                    
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Warning:</strong> 
+                        Changing the backup format or retention count will affect future backups. 
+                        Existing backups will not be converted or removed automatically.
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('repositories') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Update Repository
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

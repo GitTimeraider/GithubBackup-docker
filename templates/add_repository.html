@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block page_title %}Add Repository{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-plus"></i> Add New Repository
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="repo_url" class="form-label">Repository URL <span class="text-danger">*</span></label>
+                        <input type="url" class="form-control" id="repo_url" name="repo_url" required
+                               placeholder="https://github.com/username/repository">
+                        <div class="form-text">
+                            Enter the GitHub repository URL (e.g., https://github.com/username/repository)
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="github_token" class="form-label">GitHub Token</label>
+                        <input type="password" class="form-control" id="github_token" name="github_token"
+                               placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+                        <div class="form-text">
+                            <i class="fas fa-info-circle"></i>
+                            Required for private repositories. Create a Personal Access Token in GitHub Settings.
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="backup_format" class="form-label">Backup Format <span class="text-danger">*</span></label>
+                            <select class="form-select" id="backup_format" name="backup_format" required>
+                                <option value="folder">Folder Structure</option>
+                                <option value="zip">ZIP Archive</option>
+                                <option value="tar.gz">TAR.GZ Archive</option>
+                            </select>
+                            <div class="form-text">
+                                Choose how to store the backup files
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="schedule_type" class="form-label">Backup Schedule <span class="text-danger">*</span></label>
+                            <select class="form-select" id="schedule_type" name="schedule_type" required>
+                                <option value="manual">Manual Only</option>
+                                <option value="hourly">Every Hour</option>
+                                <option value="daily" selected>Daily (2 AM)</option>
+                                <option value="weekly">Weekly (Sunday 2 AM)</option>
+                                <option value="monthly">Monthly (1st, 2 AM)</option>
+                            </select>
+                            <div class="form-text">
+                                When to automatically backup this repository
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="retention_count" class="form-label">Retention Count <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="retention_count" name="retention_count" 
+                               value="5" min="1" max="50" required>
+                        <div class="form-text">
+                            Number of backup versions to keep (older backups will be automatically deleted)
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Note:</strong> 
+                        <ul class="mb-0 mt-2">
+                            <li>For private repositories, you'll need a GitHub Personal Access Token</li>
+                            <li>The token needs repository read access</li>
+                            <li>Backups exclude the .git directory to save space</li>
+                            <li>Failed backups will be retried on the next scheduled run</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('repositories') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Add Repository
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('repo_url').addEventListener('blur', function() {
+    const url = this.value;
+    if (url && url.includes('github.com/')) {
+        // Extract repository name from URL for display
+        const parts = url.split('/');
+        if (parts.length >= 2) {
+            const repoName = parts[parts.length - 1].replace('.git', '');
+            console.log('Repository name extracted:', repoName);
+        }
+    }
+});
+</script>
+{% endblock %}

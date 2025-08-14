@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Stats Cards -->
+    <div class="col-md-3 mb-4">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ repositories|length }}</h4>
+                        <p class="mb-0">Repositories</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-code-branch fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-4">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ repositories|selectattr('is_active')|list|length }}</h4>
+                        <p class="mb-0">Active</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-check-circle fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-4">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ recent_jobs|selectattr('status', 'equalto', 'completed')|list|length }}</h4>
+                        <p class="mb-0">Completed</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-archive fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-4">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ recent_jobs|selectattr('status', 'equalto', 'failed')|list|length }}</h4>
+                        <p class="mb-0">Failed</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-exclamation-triangle fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Recent Repositories -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-code-branch"></i> Repositories
+                </h5>
+                <a href="{{ url_for('add_repository') }}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-plus"></i> Add Repository
+                </a>
+            </div>
+            <div class="card-body">
+                {% if repositories %}
+                    {% for repo in repositories[:5] %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <strong>{{ repo.name }}</strong>
+                            <br>
+                            <small class="text-muted">
+                                {{ repo.schedule_type.title() }} backup
+                                {% if repo.last_backup %}
+                                    - Last: {{ repo.last_backup.strftime('%Y-%m-%d %H:%M') }}
+                                {% endif %}
+                            </small>
+                        </div>
+                        <div>
+                            {% if repo.is_active %}
+                                <span class="badge bg-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Inactive</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if not loop.last %}<hr>{% endif %}
+                    {% endfor %}
+                    {% if repositories|length > 5 %}
+                    <hr>
+                    <div class="text-center">
+                        <a href="{{ url_for('repositories') }}" class="btn btn-outline-primary btn-sm">
+                            View All Repositories
+                        </a>
+                    </div>
+                    {% endif %}
+                {% else %}
+                    <div class="text-center text-muted">
+                        <i class="fas fa-inbox fa-3x mb-3"></i>
+                        <p>No repositories added yet</p>
+                        <a href="{{ url_for('add_repository') }}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Add Your First Repository
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Backup Jobs -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-history"></i> Recent Backup Jobs
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if recent_jobs %}
+                    {% for job in recent_jobs[:5] %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <strong>{{ job.repository.name }}</strong>
+                            <br>
+                            <small class="text-muted">
+                                {{ job.created_at.strftime('%Y-%m-%d %H:%M') }}
+                            </small>
+                        </div>
+                        <div>
+                            {% if job.status == 'completed' %}
+                                <span class="badge bg-success">Completed</span>
+                            {% elif job.status == 'failed' %}
+                                <span class="badge bg-danger">Failed</span>
+                            {% elif job.status == 'running' %}
+                                <span class="badge bg-warning">Running</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ job.status.title() }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if not loop.last %}<hr>{% endif %}
+                    {% endfor %}
+                    <hr>
+                    <div class="text-center">
+                        <a href="{{ url_for('backup_jobs') }}" class="btn btn-outline-primary btn-sm">
+                            View All Jobs
+                        </a>
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted">
+                        <i class="fas fa-clock fa-3x mb-3"></i>
+                        <p>No backup jobs yet</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

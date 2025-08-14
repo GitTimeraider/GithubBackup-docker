@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block page_title %}Backup Jobs{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Backup Jobs</h2>
+    <div>
+        <button class="btn btn-outline-primary" onclick="location.reload()">
+            <i class="fas fa-sync-alt"></i> Refresh
+        </button>
+    </div>
+</div>
+
+{% if jobs %}
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Repository</th>
+                        <th>Status</th>
+                        <th>Started</th>
+                        <th>Duration</th>
+                        <th>File Size</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for job in jobs %}
+                    <tr>
+                        <td>
+                            <strong>{{ job.repository.name }}</strong>
+                            <br>
+                            <small class="text-muted">{{ job.repository.backup_format.upper() }}</small>
+                        </td>
+                        <td>
+                            {% if job.status == 'completed' %}
+                                <span class="badge bg-success">
+                                    <i class="fas fa-check"></i> Completed
+                                </span>
+                            {% elif job.status == 'failed' %}
+                                <span class="badge bg-danger">
+                                    <i class="fas fa-times"></i> Failed
+                                </span>
+                            {% elif job.status == 'running' %}
+                                <span class="badge bg-warning">
+                                    <i class="fas fa-spinner fa-spin"></i> Running
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary">
+                                    <i class="fas fa-clock"></i> {{ job.status.title() }}
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if job.started_at %}
+                                {{ job.started_at.strftime('%Y-%m-%d %H:%M') }}
+                            {% else %}
+                                <span class="text-muted">Not started</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if job.started_at and job.completed_at %}
+                                {% set duration = job.completed_at - job.started_at %}
+                                {% if duration.total_seconds() < 60 %}
+                                    {{ "%.1f"|format(duration.total_seconds()) }}s
+                                {% elif duration.total_seconds() < 3600 %}
+                                    {{ "%.1f"|format(duration.total_seconds()/60) }}m
+                                {% else %}
+                                    {{ "%.1f"|format(duration.total_seconds()/3600) }}h
+                                {% endif %}
+                            {% elif job.started_at and job.status == 'running' %}
+                                <span class="text-warning">
+                                    <i class="fas fa-clock"></i> Running...
+                                </span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if job.file_size %}
+                                {% if job.file_size < 1024 %}
+                                    {{ job.file_size }} B
+                                {% elif job.file_size < 1024*1024 %}
+                                    {{ "%.1f"|format(job.file_size/1024) }} KB
+                                {% elif job.file_size < 1024*1024*1024 %}
+                                    {{ "%.1f"|format(job.file_size/(1024*1024)) }} MB
+                                {% else %}
+                                    {{ "%.1f"|format(job.file_size/(1024*1024*1024)) }} GB
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if job.error_message %}
+                                <button type="button" class="btn btn-outline-danger btn-sm" 
+                                        data-bs-toggle="modal" data-bs-target="#errorModal{{ job.id }}">
+                                    <i class="fas fa-exclamation-circle"></i> View Error
+                                </button>
+                            {% elif job.backup_path %}
+                                <button type="button" class="btn btn-outline-info btn-sm" 
+                                        data-bs-toggle="modal" data-bs-target="#pathModal{{ job.id }}">
+                                    <i class="fas fa-folder"></i> View Path
+                                </button>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Error Modals -->
+{% for job in jobs %}
+    {% if job.error_message %}
+    <div class="modal fade" id="errorModal{{ job.id }}" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-exclamation-circle"></i> Backup Error
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <h6>Repository: {{ job.repository.name }}</h6>
+                    <h6>Job ID: {{ job.id }}</h6>
+                    <h6>Date: {{ job.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</h6>
+                    <hr>
+                    <h6>Error Message:</h6>
+                    <pre class="bg-light p-3 rounded">{{ job.error_message }}</pre>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% if job.backup_path %}
+    <div class="modal fade" id="pathModal{{ job.id }}" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-folder"></i> Backup Location
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <h6>Repository: {{ job.repository.name }}</h6>
+                    <h6>Job ID: {{ job.id }}</h6>
+                    <h6>Date: {{ job.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</h6>
+                    <hr>
+                    <h6>Backup Path:</h6>
+                    <code>{{ job.backup_path }}</code>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+{% endfor %}
+
+{% else %}
+<div class="text-center">
+    <div class="card">
+        <div class="card-body">
+            <i class="fas fa-clock fa-5x text-muted mb-4"></i>
+            <h3 class="text-muted">No Backup Jobs</h3>
+            <p class="text-muted">No backup jobs have been created yet.</p>
+            <a href="{{ url_for('add_repository') }}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Add Repository to Start Backing Up
+            </a>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Auto-refresh every 30 seconds for running jobs
+{% for job in jobs %}
+    {% if job.status == 'running' %}
+setTimeout(function() {
+    location.reload();
+}, 30000);
+        {% break %}
+    {% endif %}
+{% endfor %}
+</script>
+{% endblock %}

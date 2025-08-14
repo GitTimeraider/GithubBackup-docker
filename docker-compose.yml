@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  github-backup:
+    build: .
+    container_name: github-backup
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+      - ./backups:/app/backups
+      - ./logs:/app/logs
+    environment:
+      - SECRET_KEY=your-secret-key-change-this
+      - DATABASE_URL=sqlite:///data/github_backup.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
