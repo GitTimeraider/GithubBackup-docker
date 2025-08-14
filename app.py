@@ -233,7 +233,8 @@ def manual_backup(repo_id):
 @login_required
 def backup_jobs():
     jobs = BackupJob.query.filter_by(user_id=current_user.id).order_by(BackupJob.created_at.desc()).all()
-    return render_template('backup_jobs.html', jobs=jobs)
+    has_running = any(job.status == 'running' for job in jobs)
+    return render_template('backup_jobs.html', jobs=jobs, has_running=has_running)
 
 @app.route('/health')
 def health_check():

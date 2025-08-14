@@ -189,15 +189,10 @@
 {% endblock %}
 
 {% block scripts %}
+{% if has_running %}
 <script>
-// Auto-refresh every 30 seconds for running jobs
-{% for job in jobs %}
-    {% if job.status == 'running' %}
-setTimeout(function() {
-    location.reload();
-}, 30000);
-        {% break %}
-    {% endif %}
-{% endfor %}
+// Auto-refresh every 30 seconds while at least one job is running
+setTimeout(function(){ location.reload(); }, 30000);
 </script>
+{% endif %}
 {% endblock %}
