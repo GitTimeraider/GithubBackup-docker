@@ -11,4 +11,4 @@ requests==2.31.0
 sqlalchemy==2.0.23
 flask-sqlalchemy==3.0.5
 wtforms==3.1.0
-gunicorn==21.2.0
+gunicorn==23.0.0
