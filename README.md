@@ -1,4 +1,4 @@
-UNDER DEVELOPMENT
+UNDER DEVELOPMENT. Do NOT use!
 
 # GitHub Backup Service
 
