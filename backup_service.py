@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from github import Github
 from models import db, BackupJob
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -179,22 +180,26 @@ class BackupService:
     def verify_github_access(self, repo_url, github_token=None):
         """Verify if we can access a GitHub repository"""
         try:
-            # Extract owner and repo name from URL
-            if 'github.com/' in repo_url:
-                parts = repo_url.split('github.com/')[-1].split('/')
-                if len(parts) >= 2:
-                    owner = parts[0]
-                    repo_name = parts[1].replace('.git', '')
-                    
+            # Parse the URL and check the hostname
+            parsed = urlparse(repo_url)
+            if parsed.hostname and parsed.hostname.lower() == "github.com":
+                # Path is of the form /owner/repo(.git)? or /owner/repo/
+                path_parts = parsed.path.strip("/").split("/")
+                if len(path_parts) >= 2:
+                    owner = path_parts[0]
+                    repo_name = path_parts[1]
+                    if repo_name.endswith('.git'):
+                        repo_name = repo_name[:-4]
+
                     if github_token:
                         g = Github(github_token)
                     else:
                         g = Github()  # Anonymous access for public repos
-                    
+
                     repo = g.get_repo(f"{owner}/{repo_name}")
                     return True, f"Repository access verified: {repo.full_name}"
-            
+
             return False, "Invalid GitHub repository URL"
-            
+
         except Exception as e:
             return False, f"Repository access failed: {str(e)}"
