@@ -60,8 +60,6 @@ docker run -d \
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `SECRET_KEY` | Flask secret key for sessions | `dev-secret-key-change-in-production` |
-| `DATABASE_URL` | Database connection string | `sqlite:///data/github_backup.db` |
-| `BACKUP_BASE_DIR` | Base directory for backups | `/app/backups` |
 | `LOG_LEVEL` | Logging level | `INFO` |
 
 ### GitHub Token Setup
