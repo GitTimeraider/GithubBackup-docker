@@ -3,7 +3,7 @@ flask-login==0.6.3
 flask-wtf==1.1.1
 werkzeug==2.3.7
 bcrypt==4.0.1
-APScheduler==3.10.4
+APScheduler==3.11.0
 PyGithub==1.59.1
 gitpython==3.1.37
 python-dotenv==1.0.0
