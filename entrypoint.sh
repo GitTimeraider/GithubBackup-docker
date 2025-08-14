@@ -8,28 +8,25 @@ PGID=${PGID:-1000}
 CURRENT_UID=$(id -u appuser)
 CURRENT_GID=$(id -g appuser)
 
-# Only modify user/group if they're different from current
+# Adjust IDs if needed
 if [ "$PUID" != "$CURRENT_UID" ] || [ "$PGID" != "$CURRENT_GID" ]; then
-    echo "Updating user appuser to UID:$PUID and GID:$PGID"
-    
-    # Update group ID if needed
-    if [ "$PGID" != "$CURRENT_GID" ]; then
-        groupmod -g "$PGID" appuser
-    fi
-    
-    # Update user ID if needed
-    if [ "$PUID" != "$CURRENT_UID" ]; then
-        usermod -u "$PUID" appuser
-    fi
-    
-    # Fix ownership of app directory
-    chown -R appuser:appuser /app
-    
-    # Fix ownership of mounted volumes if they exist
-    [ -d /app/data ] && chown -R appuser:appuser /app/data
-    [ -d /app/backups ] && chown -R appuser:appuser /app/backups
-    [ -d /app/logs ] && chown -R appuser:appuser /app/logs
+    echo "Updating user appuser to UID:$PUID GID:$PGID"
+    [ "$PGID" != "$CURRENT_GID" ] && groupmod -g "$PGID" appuser
+    [ "$PUID" != "$CURRENT_UID" ] && usermod -u "$PUID" appuser
 fi
 
-# Switch to appuser and execute the original command
+# Always ensure directories exist and are owned correctly (important for SQLite write access)
+for d in /app/data /app/backups /app/logs; do
+    mkdir -p "$d"
+    chown -R appuser:appuser "$d" 2>/dev/null || true
+    chmod 775 "$d" 2>/dev/null || true
+done
+
+# Ensure app code ownership (helps when mounting volumes)
+chown -R appuser:appuser /app 2>/dev/null || true
+
+echo "Directory permissions:"
+ls -ld /app/data /app/backups /app/logs 2>/dev/null || true
+
+echo "Switching to appuser..."
 exec gosu appuser "$@"
