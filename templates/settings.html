@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block page_title %}User Settings{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card mb-4">
+      <div class="card-header"><i class="fas fa-user-cog"></i> Update Account</div>
+      <div class="card-body">
+        <form method="POST">
+          <div class="mb-3">
+            <label class="form-label">Username</label>
+            <input type="text" class="form-control" name="username" value="{{ current_user.username }}">
+          </div>
+          <hr>
+          <div class="mb-3">
+            <label class="form-label">Current Password</label>
+            <input type="password" class="form-control" name="current_password" placeholder="Enter current password to change it">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">New Password</label>
+            <input type="password" class="form-control" name="new_password">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Confirm New Password</label>
+            <input type="password" class="form-control" name="confirm_password">
+          </div>
+          <button class="btn btn-primary w-100" type="submit">Save Changes</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

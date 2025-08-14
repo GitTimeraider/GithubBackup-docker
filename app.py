@@ -8,7 +8,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 import logging
 from backup_service import BackupService
-from models import db, User, Repository, BackupJob
+from models import db, User, Repository, BackupJob, PasswordResetCode
 import atexit
 
 # Configure logging
@@ -82,6 +82,12 @@ def dashboard():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # Auto-create default admin if no users
+    if User.query.count() == 0:
+        admin = User(username='admin', password_hash=generate_password_hash('changeme'), is_admin=True)
+        db.session.add(admin)
+        db.session.commit()
+        logger.warning('Default admin user created with username=admin password=changeme; please change immediately.')
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
@@ -101,37 +107,84 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    # Check if this is the first user (admin)
-    user_count = User.query.count()
-    
+@app.route('/settings', methods=['GET', 'POST'])
+@login_required
+def user_settings():
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        confirm_password = request.form['confirm_password']
-        
-        if password != confirm_password:
-            flash('Passwords do not match', 'error')
-            return render_template('register.html', first_user=user_count == 0)
-        
-        if User.query.filter_by(username=username).first():
-            flash('Username already exists', 'error')
-            return render_template('register.html', first_user=user_count == 0)
-        
-        user = User(
-            username=username,
-            password_hash=generate_password_hash(password),
-            is_admin=(user_count == 0)  # First user becomes admin
-        )
-        db.session.add(user)
+        new_username = request.form.get('username', '').strip()
+        current_password = request.form.get('current_password', '')
+        new_password = request.form.get('new_password', '')
+        confirm_password = request.form.get('confirm_password', '')
+
+        # Change username
+        if new_username and new_username != current_user.username:
+            if User.query.filter_by(username=new_username).first():
+                flash('Username already taken', 'error')
+                return redirect(url_for('user_settings'))
+            current_user.username = new_username
+            flash('Username updated', 'success')
+
+        # Change password
+        if new_password:
+            if not check_password_hash(current_user.password_hash, current_password):
+                flash('Current password incorrect', 'error')
+                return redirect(url_for('user_settings'))
+            if new_password != confirm_password:
+                flash('New passwords do not match', 'error')
+                return redirect(url_for('user_settings'))
+            current_user.password_hash = generate_password_hash(new_password)
+            flash('Password updated', 'success')
+
         db.session.commit()
-        
-        login_user(user)
-        flash('Registration successful', 'success')
-        return redirect(url_for('dashboard'))
-    
-    return render_template('register.html', first_user=user_count == 0)
+        return redirect(url_for('user_settings'))
+
+    return render_template('settings.html')
+
+import secrets
+
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        user = User.query.filter_by(username=username).first()
+        if not user:
+            flash('If that user exists, a reset code has been generated (check logs).', 'info')
+            return redirect(url_for('forgot_password'))
+        # Invalidate previous unused codes for this user
+        PasswordResetCode.query.filter_by(user_id=user.id, used=False).delete()
+        code = secrets.token_hex(4)
+        prc = PasswordResetCode(user_id=user.id, code=code)
+        db.session.add(prc)
+        db.session.commit()
+        logger.warning(f'PASSWORD RESET CODE for user={user.username}: {code}')
+        flash('Reset code generated. Check server logs.', 'info')
+        return redirect(url_for('reset_password'))
+    return render_template('forgot_password.html')
+
+@app.route('/reset-password', methods=['GET', 'POST'])
+def reset_password():
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        code = request.form.get('code', '').strip()
+        new_password = request.form.get('new_password', '')
+        confirm_password = request.form.get('confirm_password', '')
+        user = User.query.filter_by(username=username).first()
+        if not user:
+            flash('Invalid code or user', 'error')
+            return redirect(url_for('reset_password'))
+        prc = PasswordResetCode.query.filter_by(user_id=user.id, code=code, used=False).first()
+        if not prc:
+            flash('Invalid or already used code', 'error')
+            return redirect(url_for('reset_password'))
+        if new_password != confirm_password or not new_password:
+            flash('Passwords do not match or empty', 'error')
+            return redirect(url_for('reset_password'))
+        user.password_hash = generate_password_hash(new_password)
+        prc.used = True
+        db.session.commit()
+        flash('Password reset successful. You can now log in.', 'success')
+        return redirect(url_for('login'))
+    return render_template('reset_password.html')
 
 @app.route('/repositories')
 @login_required
