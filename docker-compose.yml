@@ -12,7 +12,8 @@ services:
       - ./logs:/app/logs
     environment:
       - SECRET_KEY=your-secret-key-change-this
-      - DATABASE_URL=sqlite:///data/github_backup.db
+      # Use absolute path (4 leading slashes after sqlite:) to avoid relative path ambiguity
+      - DATABASE_URL=sqlite:////app/data/github_backup.db
       - PUID=1000  # Change to your user ID (run 'id -u' to get yours)
       - PGID=1000  # Change to your group ID (run 'id -g' to get yours)
     restart: unless-stopped

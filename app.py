@@ -24,11 +24,39 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///data/github_backup.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:////app/data/github_backup.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Diagnostic logging for DB path
+db_uri = app.config['SQLALCHEMY_DATABASE_URI']
+logger.info(f"Configured DB URI: {db_uri}")
+if db_uri.startswith('sqlite:///') or db_uri.startswith('sqlite:////'):
+    # Normalize both relative and absolute sqlite URIs
+    normalized = db_uri.replace('sqlite:////', '/').replace('sqlite:///', '')
+    # If we replaced absolute variant, ensure leading slash retained
+    if db_uri.startswith('sqlite:////'):
+        sqlite_file = '/' + normalized.lstrip('/')
+    else:
+        sqlite_file = os.path.abspath(normalized)
+    parent = os.path.dirname(sqlite_file)
+    try:
+        os.makedirs(parent, exist_ok=True)
+        stat_parent = os.stat(parent)
+        logger.info(f"SQLite file target: {sqlite_file} (parent exists, perms {oct(stat_parent.st_mode)[-3:]})")
+    except Exception as e:
+        logger.error(f"Failed ensuring SQLite directory {parent}: {e}")
 
 # Initialize extensions
 db.init_app(app)
+
+# Immediate connectivity test (runs once at startup)
+from sqlalchemy import text
+with app.app_context():
+    try:
+        db.session.execute(text('SELECT 1'))
+        logger.info('Initial DB connectivity test succeeded.')
+    except Exception as e:
+        logger.error(f'Initial DB connectivity test failed: {e}')
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
