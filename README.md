@@ -155,9 +155,3 @@ Backups are organized as follows:
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Support
-
-- Create an issue for bug reports or feature requests
-- Check the logs for troubleshooting
-- Ensure GitHub tokens have appropriate permissions for private repositories
