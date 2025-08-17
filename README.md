@@ -1,7 +1,7 @@
-UNDER DEVELOPMENT. Do NOT use!
-
 # GitHub Backup Service
-
+<p align="center" width="100%">
+    <img width="33%" src="https://github.com/GitTimeraider/Assets/blob/main/GithubBackup-docker/img/ghbackup_icon.png">
+</p>
 A comprehensive web-based solution for backing up GitHub repositories with scheduling, multiple backup formats, and user management.
 
 ## Features
