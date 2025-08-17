@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -380,6 +380,10 @@ def backup_jobs():
 @app.route('/health')
 def health_check():
     return jsonify({'status': 'healthy', 'timestamp': datetime.utcnow().isoformat()})
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static', 'img'), 'ghbackup_ico.ico', mimetype='image/vnd.microsoft.icon')
 
 def schedule_backup_job(repository):
     """Schedule a backup job for a repository"""
