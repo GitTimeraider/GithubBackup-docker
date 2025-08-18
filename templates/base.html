@@ -19,9 +19,37 @@
         a { color:#6f42c1; }
         a:hover { color:#5a34a1; }
         .card { box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        body { background:#f5f5fa; }
         main { padding: 1rem 1rem 3rem; }
         @media (max-width: 576px){ main { padding-top: .75rem; } }
+        .footer-bar { 
+            position: fixed; 
+            bottom: 0; 
+            left: 0; 
+            right: 0; 
+            background: #6f42c1; 
+            padding: 8px 0; 
+            text-align: center; 
+            z-index: 1000; 
+            box-shadow: 0 -2px 4px rgba(0,0,0,0.1); 
+        }
+        .footer-bar p { 
+            margin: 0; 
+            color: white; 
+            font-size: 0.9rem; 
+        }
+        .footer-bar a { 
+            color: white; 
+            text-decoration: none; 
+            font-weight: 600; 
+        }
+        .footer-bar a:hover { 
+            color: #e9ecef; 
+            text-decoration: underline; 
+        }
+        body { 
+            background:#f5f5fa; 
+            padding-bottom: 50px; 
+        }
     </style>
 </head>
 <body>
@@ -62,6 +90,11 @@
             <h1 class="h4 mb-3">{% block page_title %}Dashboard{% endblock %}</h1>
             {% block content %}{% endblock %}
         </main>
+
+        <!-- Footer -->
+        <div class="footer-bar">
+            <p>Made by <a href="https://github.com/GitTimeraider" target="_blank" rel="noopener noreferrer">GitTimeraider</a></p>
+        </div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     {% block scripts %}{% endblock %}
