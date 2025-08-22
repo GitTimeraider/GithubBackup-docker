@@ -9,6 +9,7 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
+    theme = db.Column(db.String(10), default='dark')  # 'dark' or 'light'
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     repositories = db.relationship('Repository', backref='user', lazy=True, cascade='all, delete-orphan')

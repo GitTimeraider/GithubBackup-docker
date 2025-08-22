@@ -84,7 +84,7 @@ def dashboard():
 def login():
     # Auto-create default admin if no users
     if User.query.count() == 0:
-        admin = User(username='admin', password_hash=generate_password_hash('changeme'), is_admin=True)
+        admin = User(username='admin', password_hash=generate_password_hash('changeme'), is_admin=True, theme='dark')
         db.session.add(admin)
         db.session.commit()
         logger.warning('Default admin user created with username=admin password=changeme; please change immediately.')
@@ -111,6 +111,15 @@ def logout():
 @login_required
 def user_settings():
     if request.method == 'POST':
+        # Handle theme change
+        theme = request.form.get('theme')
+        if theme in ['dark', 'light']:
+            current_user.theme = theme
+            flash('Appearance settings updated', 'success')
+            db.session.commit()
+            return redirect(url_for('user_settings'))
+        
+        # Handle account changes
         new_username = request.form.get('username', '').strip()
         current_password = request.form.get('current_password', '')
         new_password = request.form.get('new_password', '')
@@ -380,6 +389,19 @@ def backup_jobs():
 @app.route('/health')
 def health_check():
     return jsonify({'status': 'healthy', 'timestamp': datetime.utcnow().isoformat()})
+
+@app.route('/api/theme', methods=['POST'])
+@login_required
+def update_theme():
+    data = request.get_json()
+    theme = data.get('theme')
+    
+    if theme in ['dark', 'light']:
+        current_user.theme = theme
+        db.session.commit()
+        return jsonify({'success': True, 'theme': theme})
+    
+    return jsonify({'success': False, 'error': 'Invalid theme'}), 400
 
 @app.route('/favicon.ico')
 def favicon():

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="{% if current_user.is_authenticated %}{{ current_user.theme }}{% else %}dark{% endif %}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,16 +9,130 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        :root { --bs-primary: #6f42c1; }
+        :root { 
+            --bs-primary: #6f42c1; 
+            --primary-dark: #5a34a1;
+        }
+        
+        /* Light theme variables */
+        [data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f5fa;
+            --bg-tertiary: #ffffff;
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --border-color: #dee2e6;
+            --navbar-bg: #6f42c1;
+            --navbar-text: #ffffff;
+            --card-bg: #ffffff;
+            --card-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        /* Dark theme variables */
+        [data-theme="dark"] {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --bg-tertiary: #3a3a3a;
+            --text-primary: #ffffff;
+            --text-secondary: #cccccc;
+            --border-color: #444444;
+            --navbar-bg: #6f42c1;
+            --navbar-text: #ffffff;
+            --card-bg: #2d2d2d;
+            --card-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        body {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            transition: background-color 0.3s ease, color 0.3s ease;
+            padding-bottom: 50px;
+        }
+        
         .navbar-brand { font-weight: 600; }
-        .navbar-purple { background: #6f42c1; }
-        .navbar-purple .navbar-nav .nav-link, .navbar-purple .navbar-brand, .navbar-purple .navbar-text { color: #fff; }
+        .navbar-purple { background: var(--navbar-bg); }
+        .navbar-purple .navbar-nav .nav-link, .navbar-purple .navbar-brand, .navbar-purple .navbar-text { color: var(--navbar-text); }
         .navbar-purple .nav-link.active { font-weight: 600; text-decoration: underline; }
-        .btn-primary { background:#6f42c1; border-color:#6f42c1; }
-        .btn-primary:hover { background:#5a34a1; border-color:#5a34a1; }
-        a { color:#6f42c1; }
-        a:hover { color:#5a34a1; }
-        .card { box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .btn-primary { background: var(--bs-primary); border-color: var(--bs-primary); }
+        .btn-primary:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
+        a { color: var(--bs-primary); }
+        a:hover { color: var(--primary-dark); }
+        
+        .card { 
+            background: var(--card-bg);
+            border-color: var(--border-color);
+            box-shadow: var(--card-shadow);
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+        
+        .card-header {
+            background: var(--bg-tertiary);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+        }
+        
+        .form-control {
+            background: var(--bg-primary);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+        }
+        
+        .form-control:focus {
+            background: var(--bg-primary);
+            border-color: var(--bs-primary);
+            color: var(--text-primary);
+            box-shadow: 0 0 0 0.2rem rgba(111, 66, 193, 0.25);
+        }
+        
+        .form-control::placeholder {
+            color: var(--text-secondary);
+        }
+        
+        .table {
+            color: var(--text-primary);
+        }
+        
+        .table-striped > tbody > tr:nth-of-type(odd) > td,
+        .table-striped > tbody > tr:nth-of-type(odd) > th {
+            background-color: var(--bg-tertiary);
+        }
+        
+        .alert-success {
+            background-color: #d1f2eb;
+            border-color: #a7e6cc;
+            color: #0f5132;
+        }
+        
+        .alert-danger {
+            background-color: #f8d7da;
+            border-color: #f5c2c7;
+            color: #842029;
+        }
+        
+        .alert-info {
+            background-color: #cfe2ff;
+            border-color: #9ec5fe;
+            color: #084298;
+        }
+        
+        [data-theme="dark"] .alert-success {
+            background-color: #155724;
+            border-color: #0f4a1a;
+            color: #d1f2eb;
+        }
+        
+        [data-theme="dark"] .alert-danger {
+            background-color: #721c24;
+            border-color: #5a161d;
+            color: #f8d7da;
+        }
+        
+        [data-theme="dark"] .alert-info {
+            background-color: #0c4a6e;
+            border-color: #0369a1;
+            color: #cfe2ff;
+        }
+        
         main { padding: 1rem 1rem 3rem; }
         @media (max-width: 576px){ main { padding-top: .75rem; } }
         .footer-bar { 
@@ -45,10 +159,6 @@
         .footer-bar a:hover { 
             color: #e9ecef; 
             text-decoration: underline; 
-        }
-        body { 
-            background:#f5f5fa; 
-            padding-bottom: 50px; 
         }
     </style>
 </head>
@@ -97,6 +207,23 @@
         </div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Theme switching functionality
+        function switchTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            
+            // Save theme preference via AJAX
+            if (typeof fetch !== 'undefined') {
+                fetch('/api/theme', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ theme: theme })
+                }).catch(err => console.log('Theme save failed:', err));
+            }
+        }
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

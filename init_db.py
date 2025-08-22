@@ -20,6 +20,17 @@ if __name__ == '__main__':
         try:
             # Create tables if they don't exist
             db.create_all()
+            
+            # Update existing users without theme to use dark theme
+            from models import User
+            users_without_theme = User.query.filter_by(theme=None).all()
+            for user in users_without_theme:
+                user.theme = 'dark'
+            
+            if users_without_theme:
+                db.session.commit()
+                print(f"Updated {len(users_without_theme)} users to use dark theme by default")
+            
             print("Database initialized successfully!")
             
             if db_file and os.path.exists(db_file):
