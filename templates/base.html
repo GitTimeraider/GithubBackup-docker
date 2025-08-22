@@ -92,9 +92,30 @@
             color: var(--text-primary);
         }
         
+        .table td, .table th {
+            color: var(--text-primary);
+            border-color: var(--border-color);
+        }
+        
+        .table thead th {
+            color: var(--text-primary);
+            border-color: var(--border-color);
+        }
+        
         .table-striped > tbody > tr:nth-of-type(odd) > td,
         .table-striped > tbody > tr:nth-of-type(odd) > th {
             background-color: var(--bg-tertiary);
+        }
+        
+        /* Force all text in tables to use proper colors */
+        .table td strong,
+        .table td small,
+        .table td span:not(.badge) {
+            color: var(--text-primary) !important;
+        }
+        
+        .table td small {
+            color: var(--text-secondary) !important;
         }
         
         .text-muted {
