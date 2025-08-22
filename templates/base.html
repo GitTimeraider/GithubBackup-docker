@@ -93,7 +93,7 @@
         }
         
         .table td, .table th {
-            color: var(--text-primary);
+            color: var(--text-primary) !important;
             border-color: var(--border-color);
         }
         
@@ -108,6 +108,8 @@
         }
         
         /* Force all text in tables to use proper colors */
+        .table td,
+        .table td *:not(.badge):not(.btn),
         .table td strong,
         .table td small,
         .table td span:not(.badge) {
@@ -116,6 +118,11 @@
         
         .table td small {
             color: var(--text-secondary) !important;
+        }
+        
+        /* Ensure text content in table cells is visible */
+        .table tbody td {
+            color: var(--text-primary) !important;
         }
         
         .text-muted {
