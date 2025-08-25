@@ -7,7 +7,7 @@ APScheduler==3.11.0
 PyGithub==2.7.0
 gitpython==3.1.45
 python-dotenv==1.1.1
-requests==2.32.4
+requests==2.32.5
 sqlalchemy==2.0.43
 flask-sqlalchemy==3.1.1
 wtforms==3.2.1
