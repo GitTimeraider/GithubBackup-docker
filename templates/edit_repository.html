@@ -91,11 +91,12 @@
                     
                     <div class="row">
                         <div class="col-12 mb-3">
-                        <label for="retention_count" class="form-label">Retention Count <span class="text-danger">*</span></label>
-                        <input type="number" class="form-control" id="retention_count" name="retention_count" 
-                               value="{{ repository.retention_count }}" min="1" max="50" required>
-                        <div class="form-text">
-                            Number of backup versions to keep (older backups will be automatically deleted)
+                            <label for="retention_count" class="form-label">Retention Count <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="retention_count" name="retention_count" 
+                                   value="{{ repository.retention_count }}" min="1" max="50" required>
+                            <div class="form-text">
+                                Number of backup versions to keep (older backups will be automatically deleted)
+                            </div>
                         </div>
                     </div>
                     

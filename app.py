@@ -69,6 +69,30 @@ scheduler = BackgroundScheduler()
 scheduler.start()
 atexit.register(lambda: scheduler.shutdown())
 
+def schedule_all_repositories():
+    """Schedule all active repositories on startup"""
+    try:
+        repositories = Repository.query.filter_by(is_active=True).all()
+        scheduled_count = 0
+        for repository in repositories:
+            if repository.schedule_type != 'manual':
+                schedule_backup_job(repository)
+                scheduled_count += 1
+                logger.info(f"Scheduled backup job for repository: {repository.name} ({repository.schedule_type})")
+        logger.info(f"Scheduled {scheduled_count} backup jobs on startup")
+    except Exception as e:
+        logger.error(f"Error scheduling repositories on startup: {e}")
+
+# Flag to ensure we only initialize once
+_scheduler_initialized = False
+
+def ensure_scheduler_initialized():
+    """Ensure scheduler is initialized with existing repositories"""
+    global _scheduler_initialized
+    if not _scheduler_initialized:
+        schedule_all_repositories()
+        _scheduler_initialized = True
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
@@ -76,6 +100,7 @@ def load_user(user_id):
 @app.route('/')
 @login_required
 def dashboard():
+    ensure_scheduler_initialized()
     repositories = Repository.query.filter_by(user_id=current_user.id).all()
     recent_jobs = BackupJob.query.filter_by(user_id=current_user.id).order_by(BackupJob.created_at.desc()).limit(10).all()
     return render_template('dashboard.html', repositories=repositories, recent_jobs=recent_jobs)
@@ -389,6 +414,24 @@ def backup_jobs():
 @app.route('/health')
 def health_check():
     return jsonify({'status': 'healthy', 'timestamp': datetime.utcnow().isoformat()})
+
+@app.route('/api/scheduler/status')
+@login_required
+def scheduler_status():
+    """Debug endpoint to check scheduled jobs"""
+    jobs = []
+    for job in scheduler.get_jobs():
+        jobs.append({
+            'id': job.id,
+            'name': job.name,
+            'next_run': job.next_run_time.isoformat() if job.next_run_time else None,
+            'trigger': str(job.trigger)
+        })
+    return jsonify({
+        'scheduler_running': scheduler.running,
+        'scheduled_jobs': jobs,
+        'total_jobs': len(jobs)
+    })
 
 @app.route('/api/theme', methods=['POST'])
 @login_required
