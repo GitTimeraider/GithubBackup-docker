@@ -1,5 +1,7 @@
 import os
 from datetime import datetime, timedelta
+import pytz
+import time
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_from_directory
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask_sqlalchemy import SQLAlchemy
@@ -51,6 +53,75 @@ if db_uri.startswith('sqlite:///') or db_uri.startswith('sqlite:////'):
 
 # Initialize extensions
 db.init_app(app)
+
+# Configure local timezone detection
+def get_local_timezone():
+    """Detect the local system timezone"""
+    # Try environment variable first (Docker/container support)
+    tz_env = os.environ.get('TZ')
+    if tz_env:
+        try:
+            return pytz.timezone(tz_env)
+        except pytz.UnknownTimeZoneError:
+            logger.warning(f"Unknown timezone in TZ environment variable: {tz_env}")
+    
+    # Try system timezone
+    try:
+        # Get system timezone
+        local_tz_name = time.tzname[time.daylight] if time.daylight else time.tzname[0]
+        if local_tz_name:
+            # Try to map common abbreviations to full timezone names
+            tz_mapping = {
+                'CET': 'Europe/Amsterdam',
+                'CEST': 'Europe/Amsterdam', 
+                'EST': 'America/New_York',
+                'EDT': 'America/New_York',
+                'PST': 'America/Los_Angeles',
+                'PDT': 'America/Los_Angeles',
+                'UTC': 'UTC',
+                'GMT': 'UTC'
+            }
+            
+            full_tz_name = tz_mapping.get(local_tz_name, local_tz_name)
+            return pytz.timezone(full_tz_name)
+    except:
+        pass
+    
+    # Fallback to UTC
+    logger.warning("Could not detect local timezone, using UTC")
+    return pytz.UTC
+
+LOCAL_TZ = get_local_timezone()
+logger.info(f"Using timezone: {LOCAL_TZ}")
+
+def to_local_time(utc_dt):
+    """Convert UTC datetime to local time"""
+    if utc_dt is None:
+        return None
+    if utc_dt.tzinfo is None:
+        # Assume UTC if no timezone info
+        utc_dt = pytz.utc.localize(utc_dt)
+    return utc_dt.astimezone(LOCAL_TZ)
+
+# Add Jinja2 filters
+@app.template_filter('local_time')
+def local_time_filter(utc_dt):
+    """Jinja2 filter to convert UTC time to local time"""
+    return to_local_time(utc_dt)
+
+@app.template_filter('format_local_time')
+def format_local_time_filter(utc_dt, format_str='%Y-%m-%d %H:%M'):
+    """Jinja2 filter to format UTC time as local time"""
+    local_dt = to_local_time(utc_dt)
+    if local_dt is None:
+        return "Never"
+    
+    # Get timezone abbreviation
+    tz_name = local_dt.strftime('%Z')
+    if not tz_name:  # Fallback if %Z doesn't work
+        tz_name = str(LOCAL_TZ).split('/')[-1] if '/' in str(LOCAL_TZ) else str(LOCAL_TZ)
+    
+    return f"{local_dt.strftime(format_str)} {tz_name}"
 
 # Immediate connectivity test (runs once at startup)
 from sqlalchemy import text
@@ -417,7 +488,15 @@ def backup_jobs():
 
 @app.route('/health')
 def health_check():
-    return jsonify({'status': 'healthy', 'timestamp': datetime.utcnow().isoformat()})
+    local_time = datetime.now(LOCAL_TZ)
+    utc_time = datetime.utcnow()
+    return jsonify({
+        'status': 'healthy', 
+        'utc_time': utc_time.isoformat(),
+        'local_time': local_time.isoformat(),
+        'timezone': str(LOCAL_TZ),
+        'timezone_name': local_time.strftime('%Z')
+    })
 
 @app.route('/api/scheduler/status')
 @login_required
@@ -508,13 +587,13 @@ def schedule_backup_job(repository):
     
     # Create new schedule based on schedule_type
     if repository.schedule_type == 'hourly':
-        trigger = CronTrigger(minute=0)
+        trigger = CronTrigger(minute=0, timezone=LOCAL_TZ)
     elif repository.schedule_type == 'daily':
-        trigger = CronTrigger(hour=2, minute=0)  # 2 AM daily
+        trigger = CronTrigger(hour=2, minute=0, timezone=LOCAL_TZ)  # 2 AM local time
     elif repository.schedule_type == 'weekly':
-        trigger = CronTrigger(day_of_week=0, hour=2, minute=0)  # Sunday 2 AM
+        trigger = CronTrigger(day_of_week=0, hour=2, minute=0, timezone=LOCAL_TZ)  # Sunday 2 AM local time
     elif repository.schedule_type == 'monthly':
-        trigger = CronTrigger(day=1, hour=2, minute=0)  # 1st of month 2 AM
+        trigger = CronTrigger(day=1, hour=2, minute=0, timezone=LOCAL_TZ)  # 1st of month 2 AM local time
     elif repository.schedule_type == 'custom':
         # Handle custom schedule
         hour = repository.custom_hour or 2
@@ -525,40 +604,40 @@ def schedule_backup_job(repository):
         if unit == 'days':
             # For daily intervals, use interval_trigger if more than 1 day
             if interval == 1:
-                trigger = CronTrigger(hour=hour, minute=minute)  # Daily
+                trigger = CronTrigger(hour=hour, minute=minute, timezone=LOCAL_TZ)  # Daily
             else:
                 # Use interval trigger for multi-day schedules
                 from apscheduler.triggers.interval import IntervalTrigger
                 from datetime import datetime, time
-                # Calculate next run time at the specified hour/minute
-                now = datetime.now()
+                # Calculate next run time at the specified hour/minute in local timezone
+                now = datetime.now(LOCAL_TZ)
                 start_date = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
                 if start_date <= now:
-                    start_date = start_date.replace(day=start_date.day + 1)
-                trigger = IntervalTrigger(days=interval, start_date=start_date)
+                    start_date = start_date + timedelta(days=1)
+                trigger = IntervalTrigger(days=interval, start_date=start_date, timezone=LOCAL_TZ)
         elif unit == 'weeks':
             # For weekly intervals
             if interval == 1:
-                trigger = CronTrigger(day_of_week=0, hour=hour, minute=minute)  # Every Sunday
+                trigger = CronTrigger(day_of_week=0, hour=hour, minute=minute, timezone=LOCAL_TZ)  # Every Sunday
             else:
                 from apscheduler.triggers.interval import IntervalTrigger
                 from datetime import datetime
-                now = datetime.now()
+                now = datetime.now(LOCAL_TZ)
                 start_date = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
                 # Find next Sunday
                 days_until_sunday = (6 - now.weekday()) % 7
                 if days_until_sunday == 0 and start_date <= now:
                     days_until_sunday = 7
-                start_date = start_date.replace(day=start_date.day + days_until_sunday)
-                trigger = IntervalTrigger(weeks=interval, start_date=start_date)
+                start_date = start_date + timedelta(days=days_until_sunday)
+                trigger = IntervalTrigger(weeks=interval, start_date=start_date, timezone=LOCAL_TZ)
         elif unit == 'months':
             # For monthly intervals
             if interval == 1:
-                trigger = CronTrigger(day=1, hour=hour, minute=minute)  # 1st of every month
+                trigger = CronTrigger(day=1, hour=hour, minute=minute, timezone=LOCAL_TZ)  # 1st of every month
             else:
                 from apscheduler.triggers.interval import IntervalTrigger
                 from datetime import datetime
-                now = datetime.now()
+                now = datetime.now(LOCAL_TZ)
                 start_date = now.replace(day=1, hour=hour, minute=minute, second=0, microsecond=0)
                 if start_date <= now:
                     # Move to next month
@@ -567,7 +646,7 @@ def schedule_backup_job(repository):
                     else:
                         start_date = start_date.replace(month=start_date.month + 1)
                 # Note: Using weeks approximation for months since APScheduler doesn't have months interval
-                trigger = IntervalTrigger(weeks=interval*4, start_date=start_date)
+                trigger = IntervalTrigger(weeks=interval*4, start_date=start_date, timezone=LOCAL_TZ)
         else:
             return  # Invalid unit
     else:

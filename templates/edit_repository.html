@@ -116,7 +116,7 @@
                     {% if repository.last_backup %}
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle"></i>
-                        <strong>Last Backup:</strong> {{ repository.last_backup.strftime('%Y-%m-%d %H:%M:%S UTC') }}
+                        <strong>Last Backup:</strong> {{ repository.last_backup | format_local_time('%Y-%m-%d %H:%M:%S') }}
                     </div>
                     {% endif %}
                     

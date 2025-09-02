@@ -96,7 +96,7 @@
                                     {{ repo.schedule_type.title() }} backup
                                 {% endif %}
                                 {% if repo.last_backup %}
-                                    - Last: {{ repo.last_backup.strftime('%Y-%m-%d %H:%M') }}
+                                                                        - Last: {{ repo.last_backup | format_local_time }}
                                 {% endif %}
                             </small>
                         </div>
@@ -147,7 +147,7 @@
                             <strong>{{ job.repository.name }}</strong>
                             <br>
                             <small class="text-muted">
-                                {{ job.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                {{ job.created_at | format_local_time }}
                             </small>
                         </div>
                         <div>

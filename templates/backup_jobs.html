@@ -1,6 +1,21 @@
 {% extends "base.html" %}
 
-{% block page_title %}Backup Jobs{% endblock %}
+{% block page_title %}Backu                        <td>
+                            {% if job.started_at %}                <div class="mo                <div class="modal-body">
+                    <h6>Repository: {{ job.repository.name }}</h6>
+                    <h6>Job ID: {{ job.id }}</h6>
+                    <h6>Date: {{ job.created_at | format_local_time('%Y-%m-%d %H:%M:%S') }}</h6>
+                    <hr>
+                    <h6>Backup Path:</h6>dy">
+                    <h6>Repository: {{ job.repository.name }}</h6>
+                    <h6>Job ID: {{ job.id }}</h6>
+                    <h6>Date: {{ job.created_at | format_local_time('%Y-%m-%d %H:%M:%S') }}</h6>
+                    <hr>
+                    <h6>Error Message:</h6>                            {{ job.started_at | format_local_time }}
+                            {% else %}
+                                <span class="text-muted">Not started</span>
+                            {% endif %}
+                        </td>% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">

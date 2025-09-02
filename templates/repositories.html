@@ -64,7 +64,7 @@
                 <p class="card-text">
                     <small class="text-muted">
                         <i class="fas fa-clock"></i>
-                        Last backup: {{ repo.last_backup.strftime('%Y-%m-%d %H:%M') }}
+                        Last backup: {{ repo.last_backup | format_local_time }}
                     </small>
                 </p>
                 {% endif %}
