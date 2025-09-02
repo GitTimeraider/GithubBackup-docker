@@ -533,8 +533,8 @@ def test_scheduled_backup(repo_id):
                 else:
                     return f"Repository {repository.id} not found or inactive"
             except Exception as e:
-                logger.error(f"Error in test backup for repository {repository.id}: {e}")
-                return f"Error: {str(e)}"
+                logger.error(f"Error in test backup for repository {repository.id}: {e}", exc_info=True)
+                return "An internal error occurred during the backup operation."
     
     try:
         result = test_backup_with_context()
