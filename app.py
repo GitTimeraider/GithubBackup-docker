@@ -540,7 +540,8 @@ def test_scheduled_backup(repo_id):
         result = test_backup_with_context()
         return jsonify({'success': True, 'message': result})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logger.error(f"Error in /api/test-backup endpoint for repository {repo_id}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'An internal error occurred.'}), 500
 
 @app.route('/api/theme', methods=['POST'])
 @login_required
