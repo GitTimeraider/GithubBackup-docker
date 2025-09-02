@@ -22,6 +22,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Set APScheduler logging level to DEBUG for better debugging
+logging.getLogger('apscheduler').setLevel(logging.DEBUG)
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:////app/data/github_backup.db')
@@ -396,6 +399,7 @@ def manual_backup(repo_id):
     repository = Repository.query.filter_by(id=repo_id, user_id=current_user.id).first_or_404()
     
     try:
+        # Manual backups are already in app context, so no wrapper needed
         backup_service.backup_repository(repository)
         flash('Backup started successfully', 'success')
     except Exception as e:
@@ -433,6 +437,32 @@ def scheduler_status():
         'total_jobs': len(jobs)
     })
 
+@app.route('/api/test-backup/<int:repo_id>', methods=['POST'])
+@login_required
+def test_scheduled_backup(repo_id):
+    """Test endpoint to simulate a scheduled backup (for debugging)"""
+    repository = Repository.query.filter_by(id=repo_id, user_id=current_user.id).first_or_404()
+    
+    def test_backup_with_context():
+        with app.app_context():
+            try:
+                # Refresh the repository object to ensure it's bound to the current session
+                repo = Repository.query.get(repository.id)
+                if repo and repo.is_active:
+                    backup_service.backup_repository(repo)
+                    return "Backup completed successfully"
+                else:
+                    return f"Repository {repository.id} not found or inactive"
+            except Exception as e:
+                logger.error(f"Error in test backup for repository {repository.id}: {e}")
+                return f"Error: {str(e)}"
+    
+    try:
+        result = test_backup_with_context()
+        return jsonify({'success': True, 'message': result})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/theme', methods=['POST'])
 @login_required
 def update_theme():
@@ -462,6 +492,19 @@ def schedule_backup_job(repository):
         scheduler.remove_job(job_id)
     except:
         pass
+    
+    # Create a wrapper function that includes Flask app context
+    def backup_with_context():
+        with app.app_context():
+            try:
+                # Refresh the repository object to ensure it's bound to the current session
+                repo = Repository.query.get(repository.id)
+                if repo and repo.is_active:
+                    backup_service.backup_repository(repo)
+                else:
+                    logger.warning(f"Repository {repository.id} not found or inactive, skipping backup")
+            except Exception as e:
+                logger.error(f"Error in scheduled backup for repository {repository.id}: {e}")
     
     # Create new schedule based on schedule_type
     if repository.schedule_type == 'hourly':
@@ -531,9 +574,8 @@ def schedule_backup_job(repository):
         return  # Manual only
     
     scheduler.add_job(
-        func=backup_service.backup_repository,
+        func=backup_with_context,  # Use the wrapper function instead
         trigger=trigger,
-        args=[repository],
         id=job_id,
         name=f'Backup {repository.name}',
         replace_existing=True
