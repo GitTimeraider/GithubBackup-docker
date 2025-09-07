@@ -24,8 +24,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Set APScheduler logging level to DEBUG for better debugging
-logging.getLogger('apscheduler').setLevel(logging.DEBUG)
+# Set APScheduler logging level to WARNING to reduce noise
+logging.getLogger('apscheduler').setLevel(logging.WARNING)
+
+# Set timezone
+LOCAL_TZ = pytz.timezone(os.environ.get('TZ', 'UTC'))
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -138,8 +141,28 @@ login_manager.login_view = 'login'
 # Initialize backup service
 backup_service = BackupService()
 
-# Initialize scheduler
-scheduler = BackgroundScheduler()
+# Initialize scheduler with job store to prevent duplicates
+from apscheduler.jobstores.memory import MemoryJobStore
+from apscheduler.executors.pool import ThreadPoolExecutor
+
+jobstores = {
+    'default': MemoryJobStore()
+}
+executors = {
+    'default': ThreadPoolExecutor(max_workers=2)  # Limit concurrent backups
+}
+job_defaults = {
+    'coalesce': True,  # Combine multiple pending executions of the same job
+    'max_instances': 1,  # Only one instance of a job can run at a time
+    'misfire_grace_time': 60  # 1 minute grace time for missed jobs
+}
+
+scheduler = BackgroundScheduler(
+    jobstores=jobstores,
+    executors=executors,
+    job_defaults=job_defaults,
+    timezone=LOCAL_TZ
+)
 scheduler.start()
 atexit.register(lambda: scheduler.shutdown())
 
@@ -579,10 +602,21 @@ def schedule_backup_job(repository):
             try:
                 # Refresh the repository object to ensure it's bound to the current session
                 repo = Repository.query.get(repository.id)
-                if repo and repo.is_active:
-                    backup_service.backup_repository(repo)
-                else:
+                if not repo or not repo.is_active:
                     logger.warning(f"Repository {repository.id} not found or inactive, skipping backup")
+                    return
+                
+                # Check if there's already a running backup for this repository
+                running_job = BackupJob.query.filter_by(
+                    repository_id=repository.id, 
+                    status='running'
+                ).first()
+                
+                if running_job:
+                    logger.warning(f"Backup already running for repository {repo.name}, skipping")
+                    return
+                
+                backup_service.backup_repository(repo)
             except Exception as e:
                 logger.error(f"Error in scheduled backup for repository {repository.id}: {e}")
     
@@ -654,12 +688,17 @@ def schedule_backup_job(repository):
         return  # Manual only
     
     scheduler.add_job(
-        func=backup_with_context,  # Use the wrapper function instead
+        func=backup_with_context,
         trigger=trigger,
         id=job_id,
         name=f'Backup {repository.name}',
+        replace_existing=True,
+        misfire_grace_time=300,  # 5 minutes grace time
+        coalesce=True,  # Combine multiple pending executions
         replace_existing=True
     )
+    
+    logger.info(f"Scheduled backup job for {repository.name} with trigger: {trigger}")
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=False)
