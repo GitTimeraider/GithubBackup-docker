@@ -694,8 +694,7 @@ def schedule_backup_job(repository):
         name=f'Backup {repository.name}',
         replace_existing=True,
         misfire_grace_time=300,  # 5 minutes grace time
-        coalesce=True,  # Combine multiple pending executions
-        replace_existing=True
+        coalesce=True  # Combine multiple pending executions
     )
     
     logger.info(f"Scheduled backup job for {repository.name} with trigger: {trigger}")
