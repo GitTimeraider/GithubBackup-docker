@@ -56,7 +56,7 @@
                         </td>
                         <td>
                             {% if job.started_at %}
-                                {{ job.started_at.strftime('%Y-%m-%d %H:%M') }}
+                                {{ job.started_at | format_local_time('%Y-%m-%d %H:%M') }}
                             {% else %}
                                 <span class="text-muted">Not started</span>
                             {% endif %}
@@ -132,7 +132,7 @@
                 <div class="modal-body">
                     <h6>Repository: {{ job.repository.name }}</h6>
                     <h6>Job ID: {{ job.id }}</h6>
-                    <h6>Date: {{ job.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</h6>
+                    <h6>Date: {{ job.created_at | format_local_time('%Y-%m-%d %H:%M:%S') }}</h6>
                     <hr>
                     <h6>Error Message:</h6>
                     <pre class="bg-light p-3 rounded">{{ job.error_message }}</pre>
@@ -158,7 +158,7 @@
                 <div class="modal-body">
                     <h6>Repository: {{ job.repository.name }}</h6>
                     <h6>Job ID: {{ job.id }}</h6>
-                    <h6>Date: {{ job.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</h6>
+                    <h6>Date: {{ job.created_at | format_local_time('%Y-%m-%d %H:%M:%S') }}</h6>
                     <hr>
                     <h6>Backup Path:</h6>
                     <code>{{ job.backup_path }}</code>
