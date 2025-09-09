@@ -198,15 +198,24 @@ def schedule_all_repositories():
     except Exception as e:
         logger.error(f"Error scheduling repositories on startup: {e}")
 
-# Flag to ensure we only initialize once
+# Thread-safe flag to ensure we only initialize once
+import threading
+_scheduler_lock = threading.Lock()
 _scheduler_initialized = False
 
 def ensure_scheduler_initialized():
-    """Ensure scheduler is initialized with existing repositories"""
+    """Ensure scheduler is initialized with existing repositories (thread-safe)"""
     global _scheduler_initialized
-    if not _scheduler_initialized:
-        schedule_all_repositories()
-        _scheduler_initialized = True
+    if _scheduler_initialized:
+        return
+        
+    with _scheduler_lock:
+        # Double-check pattern to avoid race conditions
+        if not _scheduler_initialized:
+            logger.info("Initializing scheduler with existing repositories...")
+            schedule_all_repositories()
+            _scheduler_initialized = True
+            logger.info("Scheduler initialization completed")
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -215,7 +224,6 @@ def load_user(user_id):
 @app.route('/')
 @login_required
 def dashboard():
-    ensure_scheduler_initialized()
     repositories = Repository.query.filter_by(user_id=current_user.id).all()
     recent_jobs = BackupJob.query.filter_by(user_id=current_user.id).order_by(BackupJob.created_at.desc()).limit(10).all()
     return render_template('dashboard.html', repositories=repositories, recent_jobs=recent_jobs)
@@ -647,14 +655,15 @@ def schedule_backup_job(repository):
                 ).first()
                 
                 if running_job:
-                    logger.warning(f"Backup already running for repository {repo.name}, skipping")
+                    logger.warning(f"Backup already running for repository {repo.name} (job {running_job.id}), skipping")
                     return
                 
-                # Additional check: ensure no backup started in the last 5 minutes to prevent rapid duplicates
+                # Additional check: ensure no backup started in the last 30 seconds to prevent rapid duplicates
+                recent_cutoff = datetime.utcnow() - timedelta(seconds=30)
                 recent_backup = BackupJob.query.filter_by(
                     repository_id=repository.id
                 ).filter(
-                    BackupJob.started_at > datetime.utcnow() - timedelta(minutes=5)
+                    BackupJob.started_at > recent_cutoff
                 ).first()
                 
                 if recent_backup:
@@ -753,6 +762,16 @@ def schedule_backup_job(repository):
         logger.info(f"Job {job_id} successfully scheduled, next run: {added_job.next_run_time}")
     else:
         logger.error(f"Failed to schedule job {job_id}")
+
+# Initialize scheduler with existing repositories at startup
+# This runs after all functions are defined
+try:
+    with app.app_context():
+        logger.info("Starting scheduler initialization at app startup...")
+        ensure_scheduler_initialized()
+        logger.info("Scheduler initialization at startup completed")
+except Exception as e:
+    logger.error(f"Failed to initialize scheduler at startup: {e}")
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=False)

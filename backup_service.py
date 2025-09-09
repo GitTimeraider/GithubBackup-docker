@@ -4,7 +4,7 @@ import shutil
 import zipfile
 import tarfile
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from github import Github
 from models import db, BackupJob
@@ -21,6 +21,28 @@ class BackupService:
         """Backup a repository according to its settings"""
         logger.info(f"Starting backup for repository: {repository.name}")
         
+        # Check if there's already a running backup for this repository
+        existing_running_job = BackupJob.query.filter_by(
+            repository_id=repository.id,
+            status='running'
+        ).first()
+        
+        if existing_running_job:
+            logger.warning(f"Backup already running for repository {repository.name} (job {existing_running_job.id}), skipping")
+            return
+        
+        # Also check for very recent backups (within last 30 seconds) to prevent rapid duplicates
+        recent_cutoff = datetime.utcnow() - timedelta(seconds=30)
+        recent_job = BackupJob.query.filter_by(
+            repository_id=repository.id
+        ).filter(
+            BackupJob.started_at > recent_cutoff
+        ).first()
+        
+        if recent_job:
+            logger.warning(f"Very recent backup found for repository {repository.name} (started at {recent_job.started_at}), skipping to prevent duplicates")
+            return
+        
         # Create backup job record
         backup_job = BackupJob(
             user_id=repository.user_id,
@@ -29,7 +51,15 @@ class BackupService:
             started_at=datetime.utcnow()
         )
         db.session.add(backup_job)
-        db.session.commit()
+        
+        # Commit immediately to make this job visible to other processes/threads
+        try:
+            db.session.commit()
+            logger.info(f"Created backup job {backup_job.id} for repository {repository.name}")
+        except Exception as e:
+            logger.error(f"Failed to commit backup job creation: {e}")
+            db.session.rollback()
+            return
         
         temp_clone_dir = None
         try:
