@@ -169,6 +169,24 @@ atexit.register(lambda: scheduler.shutdown())
 def schedule_all_repositories():
     """Schedule all active repositories on startup"""
     try:
+        # Clean up any stuck 'running' jobs from previous sessions
+        stuck_jobs = BackupJob.query.filter_by(status='running').all()
+        if stuck_jobs:
+            logger.warning(f"Found {len(stuck_jobs)} stuck 'running' jobs from previous session")
+            for stuck_job in stuck_jobs:
+                stuck_job.status = 'failed'
+                stuck_job.error_message = 'Job was running when application restarted'
+                stuck_job.completed_at = datetime.utcnow()
+                logger.info(f"Marked stuck job as failed: {stuck_job.id} for repository {stuck_job.repository_id}")
+            db.session.commit()
+        
+        # First, clear any existing jobs to prevent duplicates
+        existing_jobs = scheduler.get_jobs()
+        for job in existing_jobs:
+            if job.id.startswith('backup_'):
+                scheduler.remove_job(job.id)
+                logger.info(f"Removed existing job on startup: {job.id}")
+        
         repositories = Repository.query.filter_by(is_active=True).all()
         scheduled_count = 0
         for repository in repositories:
@@ -180,15 +198,24 @@ def schedule_all_repositories():
     except Exception as e:
         logger.error(f"Error scheduling repositories on startup: {e}")
 
-# Flag to ensure we only initialize once
+# Thread-safe flag to ensure we only initialize once
+import threading
+_scheduler_lock = threading.Lock()
 _scheduler_initialized = False
 
 def ensure_scheduler_initialized():
-    """Ensure scheduler is initialized with existing repositories"""
+    """Ensure scheduler is initialized with existing repositories (thread-safe)"""
     global _scheduler_initialized
-    if not _scheduler_initialized:
-        schedule_all_repositories()
-        _scheduler_initialized = True
+    if _scheduler_initialized:
+        return
+        
+    with _scheduler_lock:
+        # Double-check pattern to avoid race conditions
+        if not _scheduler_initialized:
+            logger.info("Initializing scheduler with existing repositories...")
+            schedule_all_repositories()
+            _scheduler_initialized = True
+            logger.info("Scheduler initialization completed")
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -197,7 +224,6 @@ def load_user(user_id):
 @app.route('/')
 @login_required
 def dashboard():
-    ensure_scheduler_initialized()
     repositories = Repository.query.filter_by(user_id=current_user.id).all()
     recent_jobs = BackupJob.query.filter_by(user_id=current_user.id).order_by(BackupJob.created_at.desc()).limit(10).all()
     return render_template('dashboard.html', repositories=repositories, recent_jobs=recent_jobs)
@@ -456,14 +482,23 @@ def edit_repository(repo_id):
         
         db.session.commit()
         
-        # Reschedule the backup job
+        # Reschedule the backup job - more robust approach
+        job_id = f'backup_{repo_id}'
         try:
-            scheduler.remove_job(f'backup_{repo_id}', jobstore=None)
-        except:
-            pass
+            # Remove job if it exists
+            if scheduler.get_job(job_id):
+                scheduler.remove_job(job_id)
+                logger.info(f"Removed existing job during edit: {job_id}")
+        except Exception as e:
+            logger.warning(f"Could not remove job during edit {job_id}: {e}")
         
-        if repository.is_active:
+        # Wait a moment to ensure job removal is complete
+        import time
+        time.sleep(0.1)
+        
+        if repository.is_active and repository.schedule_type != 'manual':
             schedule_backup_job(repository)
+            logger.info(f"Rescheduled job for repository: {repository.name}")
         
         flash('Repository updated successfully', 'success')
         return redirect(url_for('repositories'))
@@ -590,11 +625,18 @@ def schedule_backup_job(repository):
     
     job_id = f'backup_{repository.id}'
     
-    # Remove existing job if it exists
+    # Remove existing job if it exists - try multiple ways to ensure it's gone
     try:
-        scheduler.remove_job(job_id)
-    except:
-        pass
+        if scheduler.get_job(job_id):
+            scheduler.remove_job(job_id)
+            logger.info(f"Removed existing scheduled job: {job_id}")
+    except Exception as e:
+        logger.warning(f"Could not remove existing job {job_id}: {e}")
+    
+    # Double-check that job is really gone
+    if scheduler.get_job(job_id):
+        logger.error(f"Job {job_id} still exists after removal attempt")
+        return
     
     # Create a wrapper function that includes Flask app context
     def backup_with_context():
@@ -613,12 +655,26 @@ def schedule_backup_job(repository):
                 ).first()
                 
                 if running_job:
-                    logger.warning(f"Backup already running for repository {repo.name}, skipping")
+                    logger.warning(f"Backup already running for repository {repo.name} (job {running_job.id}), skipping")
                     return
                 
+                # Additional check: ensure no backup started in the last 30 seconds to prevent rapid duplicates
+                recent_cutoff = datetime.utcnow() - timedelta(seconds=30)
+                recent_backup = BackupJob.query.filter_by(
+                    repository_id=repository.id
+                ).filter(
+                    BackupJob.started_at > recent_cutoff
+                ).first()
+                
+                if recent_backup:
+                    logger.warning(f"Recent backup found for repository {repo.name} (started at {recent_backup.started_at}), skipping")
+                    return
+                
+                logger.info(f"Starting scheduled backup for repository: {repo.name}")
                 backup_service.backup_repository(repo)
+                
             except Exception as e:
-                logger.error(f"Error in scheduled backup for repository {repository.id}: {e}")
+                logger.error(f"Error in scheduled backup for repository {repository.id}: {e}", exc_info=True)
     
     # Create new schedule based on schedule_type
     if repository.schedule_type == 'hourly':
@@ -693,11 +749,29 @@ def schedule_backup_job(repository):
         id=job_id,
         name=f'Backup {repository.name}',
         replace_existing=True,
-        misfire_grace_time=300,  # 5 minutes grace time
-        coalesce=True  # Combine multiple pending executions
+        misfire_grace_time=60,  # Reduced from 5 minutes to 1 minute
+        coalesce=True,  # Combine multiple pending executions
+        max_instances=1  # Only one instance of this specific job can run
     )
     
     logger.info(f"Scheduled backup job for {repository.name} with trigger: {trigger}")
+    
+    # Verify the job was actually added
+    added_job = scheduler.get_job(job_id)
+    if added_job:
+        logger.info(f"Job {job_id} successfully scheduled, next run: {added_job.next_run_time}")
+    else:
+        logger.error(f"Failed to schedule job {job_id}")
+
+# Initialize scheduler with existing repositories at startup
+# This runs after all functions are defined
+try:
+    with app.app_context():
+        logger.info("Starting scheduler initialization at app startup...")
+        ensure_scheduler_initialized()
+        logger.info("Scheduler initialization at startup completed")
+except Exception as e:
+    logger.error(f"Failed to initialize scheduler at startup: {e}")
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=False)

@@ -4,7 +4,7 @@ import shutil
 import zipfile
 import tarfile
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from github import Github
 from models import db, BackupJob
@@ -21,6 +21,28 @@ class BackupService:
         """Backup a repository according to its settings"""
         logger.info(f"Starting backup for repository: {repository.name}")
         
+        # Check if there's already a running backup for this repository
+        existing_running_job = BackupJob.query.filter_by(
+            repository_id=repository.id,
+            status='running'
+        ).first()
+        
+        if existing_running_job:
+            logger.warning(f"Backup already running for repository {repository.name} (job {existing_running_job.id}), skipping")
+            return
+        
+        # Also check for very recent backups (within last 30 seconds) to prevent rapid duplicates
+        recent_cutoff = datetime.utcnow() - timedelta(seconds=30)
+        recent_job = BackupJob.query.filter_by(
+            repository_id=repository.id
+        ).filter(
+            BackupJob.started_at > recent_cutoff
+        ).first()
+        
+        if recent_job:
+            logger.warning(f"Very recent backup found for repository {repository.name} (started at {recent_job.started_at}), skipping to prevent duplicates")
+            return
+        
         # Create backup job record
         backup_job = BackupJob(
             user_id=repository.user_id,
@@ -29,7 +51,15 @@ class BackupService:
             started_at=datetime.utcnow()
         )
         db.session.add(backup_job)
-        db.session.commit()
+        
+        # Commit immediately to make this job visible to other processes/threads
+        try:
+            db.session.commit()
+            logger.info(f"Created backup job {backup_job.id} for repository {repository.name}")
+        except Exception as e:
+            logger.error(f"Failed to commit backup job creation: {e}")
+            db.session.rollback()
+            return
         
         temp_clone_dir = None
         try:
@@ -41,19 +71,32 @@ class BackupService:
             repo_backup_dir = user_backup_dir / repository.name
             repo_backup_dir.mkdir(exist_ok=True)
             
-            # Generate timestamp for this backup
-            timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
-            backup_name = f"{repository.name}_{timestamp}"
+            # Generate timestamp for this backup with microseconds for uniqueness
+            timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')
+            backup_name = f"{repository.name}_{timestamp[:19]}"  # Keep readable format for backup name
             
             # Create unique temporary directory and ensure it's clean
             temp_clone_dir = repo_backup_dir / f"temp_{timestamp}"
             
-            # Remove temp directory if it already exists
-            if temp_clone_dir.exists():
+            # Ensure temp directory doesn't exist and create it
+            retry_count = 0
+            max_retries = 5
+            while temp_clone_dir.exists() and retry_count < max_retries:
                 logger.warning(f"Temp directory already exists, removing: {temp_clone_dir}")
-                shutil.rmtree(temp_clone_dir)
+                try:
+                    shutil.rmtree(temp_clone_dir)
+                    break
+                except (OSError, PermissionError) as e:
+                    retry_count += 1
+                    if retry_count >= max_retries:
+                        raise Exception(f"Unable to clean temp directory after {max_retries} attempts: {e}")
+                    # Add a small delay and try with a new timestamp
+                    import time
+                    time.sleep(0.1)
+                    timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')
+                    temp_clone_dir = repo_backup_dir / f"temp_{timestamp}"
             
-            temp_clone_dir.mkdir(exist_ok=True)
+            temp_clone_dir.mkdir(parents=True, exist_ok=False)
             
             self._clone_repository(repository, temp_clone_dir)
             
@@ -84,6 +127,12 @@ class BackupService:
             backup_job.status = 'failed'
             backup_job.error_message = str(e)
             backup_job.completed_at = datetime.utcnow()
+            
+            # Ensure we commit the failed status immediately
+            try:
+                db.session.commit()
+            except Exception as commit_error:
+                logger.error(f"Failed to commit backup job failure status: {commit_error}")
         
         finally:
             # Always clean up temporary directory
@@ -93,8 +142,30 @@ class BackupService:
                     shutil.rmtree(temp_clone_dir)
                 except Exception as cleanup_error:
                     logger.error(f"Failed to cleanup temp directory {temp_clone_dir}: {cleanup_error}")
+                    # Try force cleanup
+                    try:
+                        import stat
+                        def handle_remove_readonly(func, path, exc):
+                            if exc[1].errno == 13:  # Permission denied
+                                os.chmod(path, stat.S_IWRITE)
+                                func(path)
+                            else:
+                                raise
+                        shutil.rmtree(temp_clone_dir, onerror=handle_remove_readonly)
+                        logger.info(f"Force cleaned temp directory: {temp_clone_dir}")
+                    except Exception as force_error:
+                        logger.error(f"Could not force clean temp directory: {force_error}")
             
-            db.session.commit()
+            # Final commit to ensure all changes are saved
+            try:
+                db.session.commit()
+            except Exception as final_commit_error:
+                logger.error(f"Failed final commit for backup job: {final_commit_error}")
+                # Try to rollback to prevent session issues
+                try:
+                    db.session.rollback()
+                except:
+                    pass
     
     def _clone_repository(self, repository, clone_dir):
         """Clone a repository to the specified directory"""
@@ -109,28 +180,97 @@ class BackupService:
         # Clean up any existing temp directories for this repository first
         self._cleanup_temp_directories(clone_dir.parent)
         
+        # Ensure the clone directory is completely clean before starting
+        if clone_dir.exists():
+            logger.warning(f"Clone directory exists before cloning, removing: {clone_dir}")
+            try:
+                shutil.rmtree(clone_dir)
+            except Exception as e:
+                logger.error(f"Failed to remove existing clone directory: {e}")
+                raise Exception(f"Cannot clean clone directory: {e}")
+        
+        # Recreate the directory to ensure it's empty
+        clone_dir.mkdir(parents=True, exist_ok=False)
+        
         # Clone the repository with error handling
         try:
-            git.Repo.clone_from(clone_url, clone_dir, depth=1)
-            logger.info(f"Repository cloned to: {clone_dir}")
-        except git.GitCommandError as e:
-            if "already exists and is not an empty directory" in str(e):
-                logger.warning(f"Directory exists, cleaning and retrying: {clone_dir}")
-                shutil.rmtree(clone_dir)
-                clone_dir.mkdir(exist_ok=True)
-                git.Repo.clone_from(clone_url, clone_dir, depth=1)
-            else:
-                raise e
+            # Use git command directly for better error handling
+            import subprocess
+            git_cmd = [
+                'git', 'clone', 
+                '--depth=1', 
+                '--verbose',
+                '--config', 'core.autocrlf=false',  # Prevent line ending issues
+                '--config', 'core.filemode=false',  # Prevent permission issues
+                clone_url, 
+                str(clone_dir)
+            ]
+            
+            result = subprocess.run(
+                git_cmd, 
+                capture_output=True, 
+                text=True, 
+                timeout=300,  # 5 minute timeout
+                cwd=str(clone_dir.parent)
+            )
+            
+            if result.returncode != 0:
+                error_msg = f"Git clone failed with exit code {result.returncode}\n"
+                error_msg += f"stdout: {result.stdout}\n"
+                error_msg += f"stderr: {result.stderr}"
+                logger.error(error_msg)
+                raise Exception(f"Git clone failed: {result.stderr}")
+            
+            logger.info(f"Repository cloned successfully to: {clone_dir}")
+            
+        except subprocess.TimeoutExpired:
+            logger.error(f"Git clone timed out for repository: {repository.url}")
+            raise Exception("Git clone operation timed out")
+        except Exception as e:
+            logger.error(f"Git clone failed for {repository.url}: {str(e)}")
+            # Clean up on failure
+            if clone_dir.exists():
+                try:
+                    shutil.rmtree(clone_dir)
+                except:
+                    pass
+            raise e
     
     def _cleanup_temp_directories(self, repo_backup_dir):
         """Clean up old temporary directories that might be left behind"""
         try:
+            if not repo_backup_dir.exists():
+                return
+                
             temp_dirs = [d for d in repo_backup_dir.iterdir() if d.is_dir() and d.name.startswith('temp_')]
+            current_time = datetime.utcnow().timestamp()
+            
             for temp_dir in temp_dirs:
-                # Remove temp directories older than 1 hour
-                if datetime.utcnow().timestamp() - temp_dir.stat().st_mtime > 3600:
-                    logger.info(f"Cleaning up old temp directory: {temp_dir}")
-                    shutil.rmtree(temp_dir)
+                try:
+                    # Remove temp directories older than 10 minutes or any that exist from failed jobs
+                    dir_age = current_time - temp_dir.stat().st_mtime
+                    if dir_age > 600:  # 10 minutes
+                        logger.info(f"Cleaning up old temp directory: {temp_dir}")
+                        shutil.rmtree(temp_dir)
+                    elif not any(temp_dir.iterdir()):  # Empty directory
+                        logger.info(f"Cleaning up empty temp directory: {temp_dir}")
+                        shutil.rmtree(temp_dir)
+                except (OSError, PermissionError) as e:
+                    logger.warning(f"Failed to remove temp directory {temp_dir}: {e}")
+                    # Try to force remove if it's a permission issue
+                    try:
+                        import stat
+                        def handle_remove_readonly(func, path, exc):
+                            if exc[1].errno == 13:  # Permission denied
+                                os.chmod(path, stat.S_IWRITE)
+                                func(path)
+                            else:
+                                raise
+                        shutil.rmtree(temp_dir, onerror=handle_remove_readonly)
+                        logger.info(f"Force removed temp directory: {temp_dir}")
+                    except Exception as force_error:
+                        logger.error(f"Could not force remove temp directory {temp_dir}: {force_error}")
+                        
         except Exception as e:
             logger.warning(f"Failed to cleanup temp directories: {e}")
     
