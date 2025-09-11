@@ -168,6 +168,8 @@ atexit.register(lambda: scheduler.shutdown())
 
 def schedule_all_repositories():
     """Schedule all active repositories on startup"""
+    from datetime import datetime  # Import to ensure availability
+    
     try:
         # Clean up any stuck 'running' jobs from previous sessions
         stuck_jobs = BackupJob.query.filter_by(status='running').all()
@@ -621,25 +623,32 @@ def favicon():
 def schedule_backup_job(repository):
     """Schedule a backup job for a repository"""
     if not repository.is_active:
+        logger.info(f"Repository {repository.name} is inactive, not scheduling")
         return
     
     job_id = f'backup_{repository.id}'
+    logger.info(f"Attempting to schedule job {job_id} for repository {repository.name}")
     
     # Remove existing job if it exists - try multiple ways to ensure it's gone
     try:
-        if scheduler.get_job(job_id):
+        existing_job = scheduler.get_job(job_id)
+        if existing_job:
             scheduler.remove_job(job_id)
             logger.info(f"Removed existing scheduled job: {job_id}")
+        else:
+            logger.info(f"No existing job found for {job_id}")
     except Exception as e:
         logger.warning(f"Could not remove existing job {job_id}: {e}")
     
     # Double-check that job is really gone
     if scheduler.get_job(job_id):
-        logger.error(f"Job {job_id} still exists after removal attempt")
+        logger.error(f"Job {job_id} still exists after removal attempt, aborting schedule")
         return
     
     # Create a wrapper function that includes Flask app context
     def backup_with_context():
+        from datetime import datetime, timedelta  # Import inside function for closure scope
+        
         with app.app_context():
             try:
                 # Refresh the repository object to ensure it's bound to the current session
@@ -754,24 +763,44 @@ def schedule_backup_job(repository):
         max_instances=1  # Only one instance of this specific job can run
     )
     
-    logger.info(f"Scheduled backup job for {repository.name} with trigger: {trigger}")
+    logger.info(f"Successfully scheduled backup job for {repository.name} with trigger: {trigger}")
     
     # Verify the job was actually added
     added_job = scheduler.get_job(job_id)
     if added_job:
         logger.info(f"Job {job_id} successfully scheduled, next run: {added_job.next_run_time}")
     else:
-        logger.error(f"Failed to schedule job {job_id}")
+        logger.error(f"Failed to schedule job {job_id} - job not found after creation")
 
 # Initialize scheduler with existing repositories at startup
 # This runs after all functions are defined
-try:
-    with app.app_context():
-        logger.info("Starting scheduler initialization at app startup...")
-        ensure_scheduler_initialized()
-        logger.info("Scheduler initialization at startup completed")
-except Exception as e:
-    logger.error(f"Failed to initialize scheduler at startup: {e}")
+if not globals().get('_scheduler_startup_completed', False):
+    try:
+        with app.app_context():
+            logger.info("Starting scheduler initialization at app startup...")
+            
+            # Log current scheduler state
+            existing_jobs = scheduler.get_jobs()
+            logger.info(f"Scheduler has {len(existing_jobs)} existing jobs before initialization")
+            
+            ensure_scheduler_initialized()
+            
+            # Log final state
+            final_jobs = scheduler.get_jobs()
+            backup_jobs = [job for job in final_jobs if job.id.startswith('backup_')]
+            logger.info(f"Scheduler initialization completed. Total jobs: {len(final_jobs)}, Backup jobs: {len(backup_jobs)}")
+            
+            for job in backup_jobs:
+                logger.info(f"Scheduled job: {job.id} -> next run: {job.next_run_time}")
+            
+            globals()['_scheduler_startup_completed'] = True
+            
+    except Exception as e:
+        logger.error(f"Failed to initialize scheduler at startup: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+else:
+    logger.info("Scheduler startup initialization skipped - already completed")
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=False)
