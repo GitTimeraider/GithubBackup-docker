@@ -43,6 +43,12 @@ class BackupService:
             logger.warning(f"Very recent backup found for repository {repository.name} (started at {recent_job.started_at}), skipping to prevent duplicates")
             return
         
+        # Auto-cleanup: Check for and clean up any orphaned temp directories
+        user_backup_dir = self.backup_base_dir / f"user_{repository.user_id}"
+        repo_backup_dir = user_backup_dir / repository.name
+        if repo_backup_dir.exists():
+            self._cleanup_temp_directories(repo_backup_dir)
+        
         # Create backup job record
         backup_job = BackupJob(
             user_id=repository.user_id,
