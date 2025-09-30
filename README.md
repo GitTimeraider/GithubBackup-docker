@@ -4,6 +4,9 @@
 </p>
 A comprehensive web-based solution for backing up GitHub repositories with scheduling, multiple backup formats, and user management.
 
+<p align="center" width="100%">
+    <img width="33%" src="https://github.com/GitTimeraider/Assets/blob/main/GithubBackup-docker/img/dashboard3.jpg">
+</p>
 ## Features
 
 - **Web UI with Authentication**: Secure login system with automatic admin user creation
