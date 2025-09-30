@@ -30,6 +30,11 @@ A comprehensive web-based solution for backing up GitHub repositories with sched
   - Real-time backup job status tracking (running, completed, failed)
   - Detailed backup job history with timestamps
   - Recent jobs display on dashboard
+
+<p align="center" width="100%">
+    <img width="100%" src="https://github.com/GitTimeraider/Assets/blob/main/GithubBackup-docker/img/jobs.jpg">
+</p>
+
 - **User Settings**: Change username and password functionality
 - **Docker Ready**: Fully containerized with health checks and proper user permissions
 
