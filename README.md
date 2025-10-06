@@ -4,6 +4,10 @@
 </p>
 A comprehensive web-based solution for backing up GitHub repositories with scheduling, multiple backup formats, and user management.
 
+<p align="center" width="100%">
+    <img width="100%" src="https://github.com/GitTimeraider/Assets/blob/main/GithubBackup-docker/img/dashboard3.jpg">
+</p>
+
 ## Features
 
 - **Web UI with Authentication**: Secure login system with automatic admin user creation
@@ -14,6 +18,11 @@ A comprehensive web-based solution for backing up GitHub repositories with sched
   - Manual backup triggering
   - Predefined schedules: Hourly, Daily (2 AM), Weekly (Sunday 2 AM), Monthly (1st, 2 AM)
   - Custom schedules: Every X days/weeks/months at specified time
+    
+<p align="center" width="100%">
+    <img width="100%" src="https://github.com/GitTimeraider/Assets/blob/main/GithubBackup-docker/img/add.jpg">
+</p>
+
 - **Retention Policies**: Configurable backup retention (1-50 versions) with automatic cleanup
 - **Private Repository Support**: Works with GitHub Personal Access Tokens
 - **Dashboard Overview**: Statistics cards showing repository count, active repos, completed and failed jobs
@@ -21,6 +30,11 @@ A comprehensive web-based solution for backing up GitHub repositories with sched
   - Real-time backup job status tracking (running, completed, failed)
   - Detailed backup job history with timestamps
   - Recent jobs display on dashboard
+
+<p align="center" width="100%">
+    <img width="100%" src="https://github.com/GitTimeraider/Assets/blob/main/GithubBackup-docker/img/jobs.jpg">
+</p>
+
 - **User Settings**: Change username and password functionality
 - **Docker Ready**: Fully containerized with health checks and proper user permissions
 
