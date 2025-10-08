@@ -7,6 +7,7 @@
 ### Disclaimers: 
 #### AI is responsible for over half of the coding. 
 #### Keep in mind that this software is mostly developed for personal use by myself and thus might not receive all feature requests desired.
+################################################################
 
 A comprehensive web-based solution for backing up GitHub repositories with scheduling, multiple backup formats, and user management.
 
