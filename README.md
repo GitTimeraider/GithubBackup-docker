@@ -1,5 +1,9 @@
 # GitHub Backup Service
-### Disclaimers: AI is responsible for over half of the coding. Also keep in mind that this software is mostly developed for personal use by myself and thus might not receive all feature requests desired.
+### Disclaimers: 
+#### AI is responsible for over half of the coding. 
+#### Keep in mind that this software is mostly developed for personal use by myself and thus might not receive all feature requests desired.
+
+
 <p align="center" width="100%">
     <img width="33%" src="https://github.com/GitTimeraider/Assets/blob/main/GithubBackup-docker/img/ghbackup_icon.png">
 </p>
