@@ -10,7 +10,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PUID=1000 \
     PGID=1000
 
-# Install system dependencies
+# Install system dependencies including build tools for Python packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
@@ -18,6 +18,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip \
     cron \
     gosu \
+    gcc \
+    g++ \
+    make \
+    libffi-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /tmp/* \
