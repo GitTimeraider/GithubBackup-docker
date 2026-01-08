@@ -5,7 +5,7 @@ werkzeug==3.1.4
 bcrypt==5.0.0
 APScheduler==3.11.2
 PyGithub==2.8.1
-gitpython==3.1.45
+gitpython==3.1.46
 python-dotenv==1.2.1
 requests==2.32.5
 sqlalchemy==2.0.45
