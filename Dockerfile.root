@@ -1,4 +1,4 @@
-FROM python:3.15.0a3-slim
+FROM python:3.15.0a5-slim
 
 # Set environment variables to prevent interactive prompts and optimize Python
 ENV DEBIAN_FRONTEND=noninteractive \
