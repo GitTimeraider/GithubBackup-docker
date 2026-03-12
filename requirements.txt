@@ -1,7 +1,7 @@
 flask==3.1.2
 flask-login==0.6.3
 flask-wtf==1.2.2
-werkzeug==3.1.5
+werkzeug==3.1.6
 bcrypt==5.0.0
 APScheduler==3.11.2
 PyGithub==2.8.1
