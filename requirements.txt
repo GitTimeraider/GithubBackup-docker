@@ -4,7 +4,7 @@ flask-wtf==1.2.2
 werkzeug==3.1.6
 bcrypt==5.0.0
 APScheduler==3.11.2
-PyGithub==2.8.1
+PyGithub==2.9.0
 gitpython==3.1.46
 python-dotenv==1.2.2
 requests==2.32.5
