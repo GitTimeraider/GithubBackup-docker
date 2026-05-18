@@ -36,4 +36,4 @@ fi
 
 # Start the Flask application
 echo "Starting Gunicorn server..."
-exec gunicorn --bind 0.0.0.0:8080 --workers 4 --timeout 120 app:app
+exec gunicorn --bind 0.0.0.0:8080 --workers 1 --threads 4 --timeout 120 app:app
