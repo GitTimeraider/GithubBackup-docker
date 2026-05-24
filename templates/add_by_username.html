@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block page_title %}Add Repositories by Username{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-users"></i> Add All Repositories from a GitHub User
+                </h4>
+            </div>
+            <div class="card-body">
+                <!-- Loading Progress Bar (Hidden by default) -->
+                <div id="loadingBar" class="mb-4" style="display: none;">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="fas fa-spinner fa-spin me-2"></i>
+                        <span id="loadingText">Discovering repositories...</span>
+                    </div>
+                    <div class="progress" style="height: 25px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" 
+                             style="width: 100%" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100">
+                            <small>Processing</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <form method="POST" id="addByUsernameForm">
+                    <div class="mb-3">
+                        <label for="github_username" class="form-label">GitHub Username <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="github_username" name="github_username" required
+                               placeholder="e.g., torvalds, gvanrossum">
+                        <div class="form-text">
+                            Enter the GitHub username. All their public repositories will be discovered and added.
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="github_token" class="form-label">GitHub Token (Optional)</label>
+                        <input type="password" class="form-control" id="github_token" name="github_token"
+                               placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+                        <div class="form-text">
+                            <i class="fas fa-info-circle"></i>
+                            Provide a token to:
+                            <ul class="mb-0 mt-2">
+                                <li>Access private repositories (if you have access)</li>
+                                <li>Increase GitHub API rate limits</li>
+                                <li>Create a Personal Access Token in GitHub Settings</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="backup_format" class="form-label">Backup Format <span class="text-danger">*</span></label>
+                            <select class="form-select" id="backup_format" name="backup_format" required>
+                                <option value="folder">Folder Structure</option>
+                                <option value="zip">ZIP Archive</option>
+                                <option value="tar.gz">TAR.GZ Archive</option>
+                            </select>
+                            <div class="form-text">
+                                Default format for all added repositories (can be changed per-repo later)
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="schedule_type" class="form-label">Backup Schedule <span class="text-danger">*</span></label>
+                            <select class="form-select" id="schedule_type" name="schedule_type" required>
+                                <option value="manual">Manual Only</option>
+                                <option value="hourly">Every Hour</option>
+                                <option value="daily" selected>Daily (2 AM)</option>
+                                <option value="weekly">Weekly (Sunday 2 AM)</option>
+                                <option value="monthly">Monthly (1st, 2 AM)</option>
+                            </select>
+                            <div class="form-text">
+                                Default schedule for all added repositories (can be changed per-repo later)
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="retention_count" class="form-label">Retention Count <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="retention_count" name="retention_count" 
+                               value="5" min="1" max="50" required>
+                        <div class="form-text">
+                            Default number of backup versions to keep for each repository (can be changed per-repo later)
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>How this works:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Searches for all repositories owned by the specified GitHub user</li>
+                            <li>Automatically skips repositories that are already added</li>
+                            <li>Skips forked repositories (optional - can be modified)</li>
+                            <li>Applies the selected defaults to all repositories</li>
+                            <li>You can customize each repository's settings individually after adding</li>
+                            <li>If a token is provided, it will be used for private repositories</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('repositories') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Back
+                        </a>
+                        <button type="submit" id="submitBtn" class="btn btn-primary">
+                            <i class="fas fa-cloud-download-alt"></i> Discover & Add Repositories
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row justify-content-center mt-4">
+    <div class="col-md-8">
+        <div class="card border-secondary">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-lightbulb"></i> Tips
+                </h5>
+            </div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    <li><strong>Public Repositories:</strong> Can be added without a token, but you'll have limited API rate limits (60 requests/hour)</li>
+                    <li><strong>Private Repositories:</strong> Requires a GitHub Personal Access Token with repository read access</li>
+                    <li><strong>Rate Limiting:</strong> GitHub API limits unauthenticated requests. Use a token for higher limits (5000 requests/hour)</li>
+                    <li><strong>Forks:</strong> Currently skipped, but you can add them manually if needed</li>
+                    <li><strong>Large Accounts:</strong> Accounts with many repositories may take longer to process</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Validate username format
+document.getElementById('github_username').addEventListener('blur', function() {
+    const username = this.value.trim();
+    if (username && !/^[a-zA-Z0-9_-]+$/.test(username)) {
+        console.warn('Username contains invalid characters');
+    }
+});
+
+// Show loading bar when form is submitted
+document.getElementById('addByUsernameForm').addEventListener('submit', function(e) {
+    const username = document.getElementById('github_username').value.trim();
+    if (!username) {
+        e.preventDefault();
+        alert('Please enter a GitHub username');
+        return;
+    }
+    
+    // Show loading bar and disable submit button
+    document.getElementById('loadingBar').style.display = 'block';
+    document.getElementById('submitBtn').disabled = true;
+    document.getElementById('submitBtn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Searching...';
+    
+    // Update loading text based on username
+    const loadingMessages = [
+        'Discovering repositories...',
+        'Fetching from GitHub API...',
+        'Processing repository list...',
+        'Preparing to add repositories...'
+    ];
+    
+    let messageIndex = 0;
+    const messageInterval = setInterval(() => {
+        messageIndex = (messageIndex + 1) % loadingMessages.length;
+        document.getElementById('loadingText').textContent = loadingMessages[messageIndex];
+    }, 2000);
+    
+    // Store the interval ID to clear it when needed
+    this.messageInterval = messageInterval;
+});
+
+// Clear interval if page navigation occurs
+window.addEventListener('beforeunload', function() {
+    const form = document.getElementById('addByUsernameForm');
+    if (form.messageInterval) {
+        clearInterval(form.messageInterval);
+    }
+});
+</script>
+{% endblock %}
