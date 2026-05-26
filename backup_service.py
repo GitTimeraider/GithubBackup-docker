@@ -17,6 +17,29 @@ class BackupService:
         self.backup_base_dir = Path('/app/backups')
         self.backup_base_dir.mkdir(exist_ok=True)
     
+    def _extract_github_username(self, repo_url):
+        """Extract GitHub username from repository URL
+        
+        Handles both formats:
+        - https://github.com/username/repo
+        - git@github.com:username/repo.git
+        """
+        try:
+            # Parse the URL
+            if repo_url.startswith('git@'):
+                # git@github.com:username/repo.git
+                parts = repo_url.split(':')[1].split('/')
+                username = parts[0]
+            else:
+                # https://github.com/username/repo
+                parts = repo_url.rstrip('/').split('/')
+                username = parts[-2]  # Second to last part
+            
+            return username.strip()
+        except (IndexError, AttributeError):
+            logger.warning(f"Could not extract username from URL: {repo_url}, using 'unknown'")
+            return 'unknown'
+    
     def backup_repository(self, repository):
         """Backup a repository according to its settings"""
         logger.info(f"Starting backup for repository: {repository.name}")
@@ -44,7 +67,8 @@ class BackupService:
             return
         
         # Auto-cleanup: Check for and clean up any orphaned temp directories
-        user_backup_dir = self.backup_base_dir / f"user_{repository.user_id}"
+        github_username = self._extract_github_username(repository.url)
+        user_backup_dir = self.backup_base_dir / github_username
         repo_backup_dir = user_backup_dir / repository.name
         if repo_backup_dir.exists():
             self._cleanup_temp_directories(repo_backup_dir)
@@ -69,8 +93,11 @@ class BackupService:
         
         temp_clone_dir = None
         try:
-            # Create user-specific backup directory
-            user_backup_dir = self.backup_base_dir / f"user_{repository.user_id}"
+            # Extract GitHub username from repository URL
+            github_username = self._extract_github_username(repository.url)
+            
+            # Create GitHub-username-specific backup directory
+            user_backup_dir = self.backup_base_dir / github_username
             user_backup_dir.mkdir(exist_ok=True)
             
             # Create repository-specific backup directory

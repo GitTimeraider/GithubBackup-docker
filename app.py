@@ -446,7 +446,33 @@ def reset_password():
 @login_required
 def repositories():
     repos = Repository.query.filter_by(user_id=current_user.id).all()
-    return render_template('repositories.html', repositories=repos)
+    
+    # Get backup job status
+    running_jobs = BackupJob.query.filter_by(user_id=current_user.id, status='running').all()
+    pending_jobs = BackupJob.query.filter_by(user_id=current_user.id, status='pending').all()
+    completed_jobs = BackupJob.query.filter_by(user_id=current_user.id, status='completed').all()
+    failed_jobs = BackupJob.query.filter_by(user_id=current_user.id, status='failed').all()
+    
+    # Calculate status
+    total_repos = len(repos)
+    running_count = len(running_jobs)
+    pending_count = len(pending_jobs)
+    
+    # Status percentage (based on active backups vs total)
+    active_backups = running_count + pending_count
+    
+    backup_status = {
+        'running': running_count,
+        'pending': pending_count,
+        'completed': len(completed_jobs),
+        'failed': len(failed_jobs),
+        'total_repos': total_repos,
+        'active': active_backups > 0,
+        'running_jobs': running_jobs,
+        'pending_jobs': pending_jobs
+    }
+    
+    return render_template('repositories.html', repositories=repos, backup_status=backup_status)
 
 @app.route('/repositories/add', methods=['GET', 'POST'])
 @login_required
@@ -524,6 +550,154 @@ def add_repository():
         return redirect(url_for('repositories'))
     
     return render_template('add_repository.html')
+
+@app.route('/repositories/add-by-username', methods=['GET', 'POST'])
+@login_required
+def add_repositories_by_username():
+    """Add all repositories from a GitHub user"""
+    if request.method == 'POST':
+        github_username = request.form.get('github_username', '').strip()
+        github_token = request.form.get('github_token', '').strip()
+        backup_format = request.form.get('backup_format', 'folder')
+        schedule_type = request.form.get('schedule_type', 'daily')
+        retention_count = int(request.form.get('retention_count', 5))
+        
+        if not github_username:
+            flash('Please provide a GitHub username', 'error')
+            return render_template('add_by_username.html')
+        
+        try:
+            from github import Github, GithubException
+            
+            # Initialize GitHub API
+            if github_token:
+                g = Github(github_token)
+            else:
+                g = Github()  # Unauthenticated (limited rate limit)
+            
+            # Fetch the user
+            try:
+                user = g.get_user(github_username)
+            except GithubException as e:
+                flash(f'GitHub user "{github_username}" not found or API error: {str(e)}', 'error')
+                logger.warning(f"Failed to fetch GitHub user {github_username}: {str(e)}")
+                return render_template('add_by_username.html')
+            
+            # Get all repositories
+            try:
+                repos = user.get_repos(type='all')  # all, public, private
+                repos_list = list(repos)
+            except GithubException as e:
+                flash(f'Error fetching repositories: {str(e)}', 'error')
+                logger.warning(f"Failed to fetch repos for {github_username}: {str(e)}")
+                return render_template('add_by_username.html')
+            
+            if not repos_list:
+                flash(f'No repositories found for user "{github_username}"', 'info')
+                return redirect(url_for('repositories'))
+            
+            added_count = 0
+            skipped_count = 0
+            failed_repos = []
+            
+            for repo in repos_list:
+                try:
+                    # Skip if repo is a fork (optional - change if you want to include forks)
+                    if repo.fork:
+                        logger.info(f"Skipping forked repository: {repo.name}")
+                        skipped_count += 1
+                        continue
+                    
+                    repo_name = repo.name
+                    repo_url = repo.clone_url  # Uses HTTPS URL
+                    
+                    # Check if this repository already exists for this user
+                    existing = Repository.query.filter_by(
+                        user_id=current_user.id,
+                        name=repo_name,
+                        url=repo_url
+                    ).first()
+                    
+                    if existing:
+                        logger.info(f"Repository {repo_name} already exists for user, skipping")
+                        skipped_count += 1
+                        continue
+                    
+                    # Create new repository record
+                    new_repo = Repository(
+                        user_id=current_user.id,
+                        name=repo_name,
+                        url=repo_url,
+                        github_token=github_token if repo.private else '',  # Only store token for private repos
+                        backup_format=backup_format,
+                        schedule_type=schedule_type,
+                        retention_count=retention_count,
+                        is_active=True
+                    )
+                    
+                    db.session.add(new_repo)
+                    added_count += 1
+                    logger.info(f"Added repository: {repo_name}")
+                    
+                except Exception as e:
+                    failed_repos.append((repo.name, str(e)))
+                    logger.error(f"Failed to add repository {repo.name}: {str(e)}")
+                    continue
+            
+            # Commit all new repositories
+            if added_count > 0:
+                try:
+                    db.session.commit()
+                    logger.info(f"Committed {added_count} new repositories for user {current_user.id}")
+                    
+                    # Now schedule backup jobs for newly added repositories
+                    new_repos = Repository.query.filter_by(
+                        user_id=current_user.id,
+                        name=repo_name  # This will get the last one, but we'll schedule all active ones
+                    ).filter(Repository.schedule_type != 'manual').all()
+                    
+                    # Actually, let's schedule all added repos from this batch
+                    # Get repos added in last few seconds
+                    cutoff_time = datetime.utcnow() - timedelta(seconds=5)
+                    recently_added = Repository.query.filter_by(
+                        user_id=current_user.id,
+                        is_active=True
+                    ).filter(Repository.created_at > cutoff_time).all()
+                    
+                    for repo in recently_added:
+                        if repo.schedule_type != 'manual':
+                            try:
+                                schedule_backup_job(repo)
+                                logger.info(f"Scheduled backup for {repo.name}")
+                            except Exception as e:
+                                logger.error(f"Failed to schedule backup for {repo.name}: {e}")
+                    
+                except Exception as e:
+                    db.session.rollback()
+                    flash(f'Error saving repositories: {str(e)}', 'error')
+                    logger.error(f"Failed to commit repositories: {str(e)}")
+                    return render_template('add_by_username.html')
+            
+            # Build success message
+            message = f'Successfully added {added_count} repositories'
+            if skipped_count > 0:
+                message += f' ({skipped_count} skipped - already exist or are forks)'
+            if failed_repos:
+                message += f' ({len(failed_repos)} failed)'
+            
+            flash(message, 'success')
+            
+            if failed_repos:
+                logger.warning(f"Failed to add {len(failed_repos)} repositories: {failed_repos}")
+            
+            return redirect(url_for('repositories'))
+            
+        except Exception as e:
+            flash(f'Unexpected error: {str(e)}', 'error')
+            logger.error(f"Unexpected error in add_repositories_by_username: {str(e)}", exc_info=True)
+            return render_template('add_by_username.html')
+    
+    return render_template('add_by_username.html')
 
 @app.route('/repositories/<int:repo_id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -621,6 +795,43 @@ def delete_repository(repo_id):
     flash('Repository deleted successfully', 'success')
     return redirect(url_for('repositories'))
 
+@app.route('/repositories/delete-all', methods=['POST'])
+@login_required
+def delete_all_repositories():
+    """Delete all repositories for the current user"""
+    repositories = Repository.query.filter_by(user_id=current_user.id).all()
+    
+    if not repositories:
+        flash('No repositories to delete', 'info')
+        return redirect(url_for('repositories'))
+    
+    deleted_count = 0
+    
+    for repository in repositories:
+        try:
+            # Remove scheduled job
+            try:
+                scheduler.remove_job(f'backup_{repository.id}')
+                logger.info(f"Removed scheduled job for repository {repository.id}")
+            except:
+                pass
+            
+            db.session.delete(repository)
+            deleted_count += 1
+            logger.info(f"Deleted repository: {repository.name}")
+        except Exception as e:
+            logger.error(f"Failed to delete repository {repository.id}: {str(e)}")
+            continue
+    
+    if deleted_count > 0:
+        db.session.commit()
+        flash(f'Deleted {deleted_count} repository/repositories successfully', 'success')
+        logger.info(f"Deleted {deleted_count} repositories for user {current_user.id}")
+    else:
+        flash('Failed to delete repositories', 'error')
+    
+    return redirect(url_for('repositories'))
+
 @app.route('/repositories/<int:repo_id>/backup', methods=['POST'])
 @login_required
 def manual_backup(repo_id):
@@ -633,6 +844,35 @@ def manual_backup(repo_id):
     except Exception as e:
         logger.error(f"Manual backup failed: {str(e)}")
         flash('Backup failed. Check logs for details.', 'error')
+    
+    return redirect(url_for('repositories'))
+
+@app.route('/repositories/backup-all', methods=['POST'])
+@login_required
+def backup_all_repositories():
+    """Trigger backups for all active repositories"""
+    repositories = Repository.query.filter_by(user_id=current_user.id, is_active=True).all()
+    
+    if not repositories:
+        flash('No active repositories to backup', 'info')
+        return redirect(url_for('repositories'))
+    
+    backup_count = 0
+    error_count = 0
+    
+    for repository in repositories:
+        try:
+            backup_service.backup_repository(repository)
+            backup_count += 1
+            logger.info(f"Triggered backup for repository: {repository.name}")
+        except Exception as e:
+            error_count += 1
+            logger.error(f"Failed to trigger backup for {repository.name}: {str(e)}")
+    
+    if error_count == 0:
+        flash(f'Started backup for {backup_count} repositories', 'success')
+    else:
+        flash(f'Started backup for {backup_count} repositories ({error_count} failed)', 'warning')
     
     return redirect(url_for('repositories'))
 

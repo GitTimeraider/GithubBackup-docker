@@ -41,6 +41,10 @@ A comprehensive web-based solution for backing up GitHub repositories with sched
     <img width="100%" src="https://github.com/GitTimeraider/Assets/blob/main/GithubBackup-docker/img/jobs.jpg">
 </p>
 
+- **Seamless Backup Experience**: 
+  - Non-blocking backups without page refreshes
+  - Stay in place while operations run in the background
+  - Quick repository bulk import via "Add by Username" feature
 - **User Settings**: Change username and password functionality
 - **Docker Ready**: Fully containerized with health checks and proper user permissions
 
@@ -89,12 +93,12 @@ docker run -d \
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `SECRET_KEY` | Flask secret key for sessions | `dev-secret-key-change-in-production` |
-| `DATABASE_URL` | SQLite database file path | `sqlite:////app/data/github_backup.db` |
-| `PUID` | User ID for file permissions | `1000` |
-| `PGID` | Group ID for file permissions | `1000` |
+| Variable       | Description                   | Default                                |
+| -------------- | ----------------------------- | -------------------------------------- |
+| `SECRET_KEY`   | Flask secret key for sessions | `dev-secret-key-change-in-production`  |
+| `DATABASE_URL` | SQLite database file path     | `sqlite:////app/data/github_backup.db` |
+| `PUID`         | User ID for file permissions  | `1000`                                 |
+| `PGID`         | Group ID for file permissions | `1000`                                 |
 
 ### GitHub Token Setup
 

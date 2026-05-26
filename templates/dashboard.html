@@ -78,9 +78,14 @@
                 <h5 class="mb-0">
                     <i class="fas fa-code-branch"></i> Repositories
                 </h5>
-                <a href="{{ url_for('add_repository') }}" class="btn btn-primary btn-sm">
-                    <i class="fas fa-plus"></i> Add Repository
-                </a>
+                <div class="btn-group btn-group-sm" role="group">
+                    <a href="{{ url_for('add_repository') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Add Repository
+                    </a>
+                    <a href="{{ url_for('add_repositories_by_username') }}" class="btn btn-info">
+                        <i class="fas fa-users"></i> Add by Username
+                    </a>
+                </div>
             </div>
             <div class="card-body">
                 {% if repositories %}
