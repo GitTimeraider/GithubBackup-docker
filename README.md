@@ -14,7 +14,6 @@ A comprehensive web-based solution for backing up GitHub repositories with sched
     <img width="100%" src="https://github.com/GitTimeraider/Assets/blob/main/GithubBackup-docker/img/dashboard3.jpg">
 </p>
 
-
 ## Features
 
 - **Web UI with Authentication**: Secure login system with automatic admin user creation
