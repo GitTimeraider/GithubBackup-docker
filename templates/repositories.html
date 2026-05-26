@@ -3,11 +3,136 @@
 {% block page_title %}Repositories{% endblock %}
 
 {% block content %}
+<!-- Backup Status Bar -->
+<div class="alert {% if backup_status.active %}alert-info{% else %}alert-success{% endif %} mb-4" role="alert">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div>
+            <h5 class="mb-0">
+                {% if backup_status.active %}
+                    <i class="fas fa-spinner fa-spin"></i> Backup Status: In Progress
+                {% else %}
+                    <i class="fas fa-check-circle"></i> No Active Backups
+                {% endif %}
+            </h5>
+        </div>
+        <div class="badge {% if backup_status.active %}bg-info{% else %}bg-success{% endif %} fs-6">
+            {{ backup_status.total_repos }} Repositories
+        </div>
+    </div>
+    
+    {% if backup_status.active %}
+    <div class="row mt-3">
+        <div class="col-md-6">
+            <div class="d-flex align-items-center">
+                <div class="me-3">
+                    <i class="fas fa-play text-danger fa-lg"></i>
+                </div>
+                <div>
+                    <small class="text-muted">Running: </small>
+                    <strong>{{ backup_status.running }}/{{ backup_status.total_repos }}</strong>
+                    {% if backup_status.running > 0 %}
+                        <div class="small text-muted mt-1">
+                            {% for job in backup_status.running_jobs[:3] %}
+                                {{ job.repository.name }}{% if not loop.last %},{% endif %}
+                            {% endfor %}
+                            {% if backup_status.running > 3 %}
+                                and {{ backup_status.running - 3 }} more
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="d-flex align-items-center">
+                <div class="me-3">
+                    <i class="fas fa-hourglass-half text-warning fa-lg"></i>
+                </div>
+                <div>
+                    <small class="text-muted">Pending: </small>
+                    <strong>{{ backup_status.pending }}/{{ backup_status.total_repos }}</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Progress Bar -->
+    <div class="progress mt-3" style="height: 25px;">
+        {% if backup_status.total_repos > 0 %}
+            <div class="progress-bar bg-danger" role="progressbar" 
+                 style="width: {{ (backup_status.running / backup_status.total_repos * 100)|int }}%"
+                 title="Running: {{ backup_status.running }}">
+                {% if backup_status.running > 0 %}
+                    <small>Running</small>
+                {% endif %}
+            </div>
+            <div class="progress-bar bg-warning" role="progressbar"
+                 style="width: {{ (backup_status.pending / backup_status.total_repos * 100)|int }}%"
+                 title="Pending: {{ backup_status.pending }}">
+                {% if backup_status.pending > 0 %}
+                    <small>Pending</small>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="row mt-3">
+        <div class="col-md-4">
+            <div class="d-flex align-items-center">
+                <div class="me-3">
+                    <i class="fas fa-check-circle text-success fa-lg"></i>
+                </div>
+                <div>
+                    <small class="text-muted">Completed Today: </small>
+                    <strong>{{ backup_status.completed }}</strong>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="d-flex align-items-center">
+                <div class="me-3">
+                    <i class="fas fa-times-circle text-danger fa-lg"></i>
+                </div>
+                <div>
+                    <small class="text-muted">Failed: </small>
+                    <strong>{{ backup_status.failed }}</strong>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="text-end">
+                <a href="{{ url_for('backup_jobs') }}" class="btn btn-sm btn-outline-info">
+                    <i class="fas fa-history"></i> View Job History
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2>Repositories</h2>
-    <a href="{{ url_for('add_repository') }}" class="btn btn-primary">
-        <i class="fas fa-plus"></i> Add Repository
-    </a>
+    <div class="d-flex gap-3 align-items-center">
+        <form method="POST" action="{{ url_for('backup_all_repositories') }}" class="backupForm">
+            <button type="submit" class="btn btn-success" title="Backup all active repositories now">
+                <i class="fas fa-play"></i> Backup All Now
+            </button>
+        </form>
+        <a href="{{ url_for('add_repository') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Add Repository
+        </a>
+        <a href="{{ url_for('add_repositories_by_username') }}" class="btn btn-info">
+            <i class="fas fa-user"></i> Add by Username
+        </a>
+        {% if repositories %}
+        <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteAllModal" title="Delete all repositories">
+            <i class="fas fa-trash"></i> Remove All
+        </button>
+        {% endif %}
+    </div>
 </div>
 
 {% if repositories %}
@@ -70,7 +195,7 @@
                 {% endif %}
                 
                 <div class="btn-group w-100" role="group">
-                    <form method="POST" action="{{ url_for('manual_backup', repo_id=repo.id) }}" class="flex-fill">
+                    <form method="POST" action="{{ url_for('manual_backup', repo_id=repo.id) }}" class="flex-fill backupForm">
                         <button type="submit" class="btn btn-success w-100" {% if not repo.is_active %}disabled{% endif %}>
                             <i class="fas fa-play"></i> Backup Now
                         </button>
@@ -109,6 +234,41 @@
     </div>
     {% endfor %}
 </div>
+
+<!-- Delete All Modal -->
+<div class="modal fade" id="deleteAllModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Delete All</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger mb-3">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>This action cannot be undone!</strong>
+                </div>
+                <p>Are you sure you want to delete <strong>all {{ repositories|length }} repositories</strong>?</p>
+                <p class="text-muted">This will:</p>
+                <ul class="text-muted">
+                    <li>Delete all repository records from the system</li>
+                    <li>Cancel all scheduled backups</li>
+                    <li>Preserve all existing backup files in storage</li>
+                    <li><strong>This cannot be undone</strong></li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="POST" action="{{ url_for('delete_all_repositories') }}" class="d-inline">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> Delete All Repositories
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% else %}
 <div class="text-center">
     <div class="card">
@@ -123,4 +283,51 @@
     </div>
 </div>
 {% endif %}
+
+<!-- Notification Alert -->
+<div id="backupNotification" class="position-fixed top-0 start-50 translate-middle-x mt-3" style="z-index: 1050; display: none;">
+    <div class="alert alert-success alert-dismissible fade show mb-0" style="min-width: 300px;">
+        <i class="fas fa-check-circle me-2"></i>
+        <strong>Backup Started</strong> — Your backup has been queued and will start shortly.
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Handle backup forms via AJAX to prevent page refresh
+    document.querySelectorAll('.backupForm').forEach(form => {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            try {
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    }
+                });
+                
+                if (response.ok) {
+                    // Show success notification
+                    const notification = document.getElementById('backupNotification');
+                    notification.style.display = 'block';
+                    
+                    // Auto-dismiss after 4 seconds
+                    setTimeout(() => {
+                        const alert = notification.querySelector('.alert');
+                        const bsAlert = new bootstrap.Alert(alert);
+                        bsAlert.close();
+                    }, 4000);
+                } else {
+                    alert('Failed to start backup. Please try again.');
+                }
+            } catch (error) {
+                console.error('Backup error:', error);
+                alert('Error starting backup. Please try again.');
+            }
+        });
+    });
+</script>
 {% endblock %}
