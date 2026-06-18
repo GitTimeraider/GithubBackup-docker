@@ -8,7 +8,7 @@ PyGithub==2.9.1
 gitpython==3.1.50
 python-dotenv==1.2.2
 requests==2.34.2
-sqlalchemy==2.0.50
+sqlalchemy==2.0.51
 flask-sqlalchemy==3.1.1
 wtforms==3.2.2
 gunicorn==26.0.0
