@@ -12,5 +12,5 @@ sqlalchemy==2.0.50
 flask-sqlalchemy==3.1.1
 wtforms==3.2.2
 gunicorn==26.0.0
-pytz==2026.2
+pytz==2026.3.post1
 
