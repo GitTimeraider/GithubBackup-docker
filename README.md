@@ -8,6 +8,17 @@
 #### Even though guided and checked, AI is responsible for over half of the coding. Also keep in mind that this software is mostly developed for personal use by myself and thus might not receive all feature requests desired.
 ################################################################
 
+<details>
+  <summary>Open for sort of CHANGELOGS?</summary>
+
+
+**V1.01 - UI**  
+UI Overhaul  
+Fix the counter for backups done today  
+
+#############################################
+</details>
+
 A comprehensive web-based solution for backing up GitHub repositories with scheduling, multiple backup formats, and user management.
 
 <p align="center" width="100%">

@@ -39,7 +39,28 @@ class BackupService:
         except (IndexError, AttributeError):
             logger.warning(f"Could not extract username from URL: {repo_url}, using 'unknown'")
             return 'unknown'
-    
+
+    def delete_repository_backups(self, repository):
+        """Delete all backups for a repository, including the repository's backup folder itself"""
+        github_username = self._extract_github_username(repository.url)
+        user_backup_dir = self.backup_base_dir / github_username
+        repo_backup_dir = user_backup_dir / repository.name
+
+        if repo_backup_dir.exists():
+            try:
+                shutil.rmtree(repo_backup_dir)
+                logger.info(f"Removed backup folder: {repo_backup_dir}")
+            except Exception as e:
+                logger.error(f"Failed to remove backup folder {repo_backup_dir}: {str(e)}")
+
+        # Remove the now-empty username folder if no other repositories still use it
+        try:
+            if user_backup_dir.exists() and not any(user_backup_dir.iterdir()):
+                user_backup_dir.rmdir()
+                logger.info(f"Removed empty username backup folder: {user_backup_dir}")
+        except Exception as e:
+            logger.error(f"Failed to remove username backup folder {user_backup_dir}: {str(e)}")
+
     def backup_repository(self, repository):
         """Backup a repository according to its settings"""
         logger.info(f"Starting backup for repository: {repository.name}")
