@@ -17,6 +17,7 @@
 UI Overhaul
 Fix the counter for backups done today
 
+#############################################
 </details>
 
 A comprehensive web-based solution for backing up GitHub repositories with scheduling, multiple backup formats, and user management.
