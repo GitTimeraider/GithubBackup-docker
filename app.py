@@ -787,16 +787,22 @@ def edit_repository(repo_id):
 @login_required
 def delete_repository(repo_id):
     repository = Repository.query.filter_by(id=repo_id, user_id=current_user.id).first_or_404()
-    
+
     # Remove scheduled job
     try:
         scheduler.remove_job(f'backup_{repo_id}')
     except:
         pass
-    
+
+    # Remove backup files and folder from disk
+    try:
+        backup_service.delete_repository_backups(repository)
+    except Exception as e:
+        logger.error(f"Failed to delete backup files for repository {repository.id}: {str(e)}")
+
     db.session.delete(repository)
     db.session.commit()
-    
+
     flash('Repository deleted successfully', 'success')
     return redirect(url_for('repositories'))
 
@@ -820,7 +826,7 @@ def delete_all_repositories():
                 logger.info(f"Removed scheduled job for repository {repository.id}")
             except:
                 pass
-            
+
             db.session.delete(repository)
             deleted_count += 1
             logger.info(f"Deleted repository: {repository.name}")
