@@ -448,9 +448,14 @@ def repositories():
     repos = Repository.query.filter_by(user_id=current_user.id).all()
     
     # Get backup job status
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     running_jobs = BackupJob.query.filter_by(user_id=current_user.id, status='running').all()
     pending_jobs = BackupJob.query.filter_by(user_id=current_user.id, status='pending').all()
-    completed_jobs = BackupJob.query.filter_by(user_id=current_user.id, status='completed').all()
+    completed_jobs = BackupJob.query.filter(
+        BackupJob.user_id == current_user.id,
+        BackupJob.status == 'completed',
+        BackupJob.completed_at >= today_start
+    ).all()
     failed_jobs = BackupJob.query.filter_by(user_id=current_user.id, status='failed').all()
     
     # Calculate status
