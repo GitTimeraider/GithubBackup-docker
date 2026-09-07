@@ -5,12 +5,12 @@ werkzeug==3.1.8
 bcrypt==5.0.0
 APScheduler==3.11.3
 PyGithub==2.10.0
-gitpython==3.1.59
+gitpython==3.1.61
 python-dotenv==1.2.3
 requests==2.34.2
 sqlalchemy==2.0.52
 flask-sqlalchemy==3.1.1
 wtforms==3.2.2
-gunicorn==26.0.0
+gunicorn==26.2.0
 pytz==2026.3.post1
 
