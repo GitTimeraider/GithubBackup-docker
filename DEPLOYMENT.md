@@ -186,6 +186,20 @@ uid=1000(username) gid=1000(username) groups=1000(username),4(adm),24(cdrom)...
 
 In this case, set `PUID=1000` and `PGID=1000`.
 
+#### Running with `--cap-drop=ALL`
+
+The entrypoint starts as root to apply `PUID`/`PGID`, fix volume ownership and then switch to `appuser`. That needs a few capabilities, so with `--cap-drop=ALL` choose one of:
+
+1. Add back only what the entrypoint needs:
+   ```bash
+   --cap-drop=ALL --cap-add=SETUID --cap-add=SETGID --cap-add=CHOWN --cap-add=DAC_OVERRIDE --cap-add=FOWNER
+   ```
+2. Or skip the user switch and run directly as your user (PUID/PGID are then ignored). The host directories mounted on `/app/data`, `/app/backups` and `/app/logs` must already be owned by that user:
+   ```bash
+   --cap-drop=ALL --user 99:100
+   ```
+   In docker-compose: `user: "99:100"` together with `cap_drop: [ALL]`.
+
 ### 5. First Time Setup
 
 1. Access the web interface at `http://localhost:8080`
