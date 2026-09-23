@@ -12,7 +12,7 @@
   <summary>Open for sort of CHANGELOGS?</summary>
 
 **V1.02 - cap-drop=all**  
-Added the option to make use of --cap-drop=ALL as long asd you specific an user in an parameter ( --user xx:xx)
+Added the option to make use of --cap-drop=ALL as long as you specify an user in an parameter ( --user xx:xx)
 
 **V1.01 - UI**  
 UI Overhaul  
