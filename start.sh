@@ -5,7 +5,7 @@ echo "Starting GitHub Backup Service..."
 
 # Ensure required directories exist with proper permissions
 mkdir -p /app/data /app/logs /app/backups
-chmod 755 /app/data /app/logs /app/backups
+chmod 755 /app/data /app/logs /app/backups 2>/dev/null || true
 
 echo "Directories created/verified:"
 ls -la /app/ | grep -E "(data|logs|backups)"
