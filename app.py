@@ -450,8 +450,8 @@ def reset_password():
 @app.route('/repositories')
 @login_required
 def repositories():
-    repos = Repository.query.filter_by(user_id=current_user.id).all()
-    
+    repos = Repository.query.filter_by(user_id=current_user.id).order_by(Repository.id).all()
+
     # Get backup job status
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     running_jobs = BackupJob.query.filter_by(user_id=current_user.id, status='running').all()

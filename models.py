@@ -44,6 +44,19 @@ class Repository(db.Model):
     
     backup_jobs = db.relationship('BackupJob', backref='repository', lazy=True, cascade='all, delete-orphan')
 
+    @property
+    def owner(self):
+        """GitHub owner (user or organization) taken from the repository URL"""
+        url = (self.url or '').strip()
+        try:
+            if url.startswith('git@'):
+                # git@github.com:owner/repo.git
+                return url.split(':', 1)[1].split('/')[0]
+            # https://github.com/owner/repo(.git)
+            return url.rstrip('/').split('/')[-2]
+        except IndexError:
+            return ''
+
 class BackupJob(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
