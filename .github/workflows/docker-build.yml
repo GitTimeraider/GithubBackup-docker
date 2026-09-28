@@ -4,8 +4,17 @@ on:
   push:
     branches: [ main, develop ]
     tags: [ 'v*' ]
+    # Don't build an image when only documentation changed
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.github/dependabot.yml'
   pull_request:
     branches: [ develop ]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.github/dependabot.yml'
 
 env:
   REGISTRY: ghcr.io
