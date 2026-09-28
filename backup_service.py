@@ -1,18 +1,23 @@
 import os
+import re
 import git
 import shutil
+import requests
 import zipfile
 import tarfile
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 from github import Github
-from models import db, BackupJob
+from models import db, BackupJob, RELEASE_MODES
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
 class BackupService:
+    # Folder inside each backup that holds downloaded release files
+    RELEASES_DIR_NAME = '_releases'
+
     def __init__(self):
         self.backup_base_dir = Path('/app/backups')
         self.backup_base_dir.mkdir(exist_ok=True)
@@ -153,7 +158,10 @@ class BackupService:
             temp_clone_dir.mkdir(parents=True, exist_ok=False)
             
             self._clone_repository(repository, temp_clone_dir)
-            
+
+            # Download release files into the backup if enabled for this repository
+            self._download_releases(repository, temp_clone_dir / self.RELEASES_DIR_NAME)
+
             # Create backup in specified format
             backup_path = self._create_backup(
                 temp_clone_dir, 
@@ -290,6 +298,100 @@ class BackupService:
                     pass
             raise e
     
+    def _parse_owner_repo(self, repo_url):
+        """Return (owner, repo_name) for a GitHub URL, or None if it is not a GitHub URL"""
+        if repo_url.startswith('git@'):
+            # git@github.com:owner/repo.git
+            host, _, path = repo_url[len('git@'):].partition(':')
+        else:
+            parsed = urlparse(repo_url)
+            host, path = parsed.hostname or '', parsed.path
+
+        if host.lower() != 'github.com':
+            return None
+
+        path_parts = path.strip('/').split('/')
+        if len(path_parts) < 2:
+            return None
+
+        repo_name = path_parts[1]
+        if repo_name.endswith('.git'):
+            repo_name = repo_name[:-4]
+        return path_parts[0], repo_name
+
+    def _safe_filename(self, name):
+        """Make a release tag or asset name safe to use as a single path component"""
+        safe = re.sub(r'[^A-Za-z0-9._-]', '_', name).strip('.')
+        return safe or 'unnamed'
+
+    def _download_file(self, url, destination, headers):
+        """Stream a file from the GitHub API to disk"""
+        with requests.get(url, headers=headers, stream=True, timeout=(30, 300), allow_redirects=True) as response:
+            response.raise_for_status()
+            with open(destination, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=1024 * 1024):
+                    if chunk:
+                        f.write(chunk)
+
+    def _download_releases(self, repository, releases_dir):
+        """Download release assets and source archives according to the repository's release mode"""
+        release_mode = repository.release_mode or 'none'
+        if release_mode not in RELEASE_MODES:
+            logger.warning(f"Unknown release mode '{release_mode}' for {repository.name}, skipping releases")
+            return
+        if release_mode == 'none':
+            return
+
+        owner_repo = self._parse_owner_repo(repository.url)
+        if not owner_repo:
+            raise Exception(f"Cannot back up releases: not a GitHub repository URL: {repository.url}")
+        owner, repo_name = owner_repo
+
+        token = repository.github_token.strip() if repository.github_token else ''
+        g = Github(token) if token else Github()
+        gh_repo = g.get_repo(f"{owner}/{repo_name}")
+
+        # The API returns releases newest first; drafts are not published releases
+        limit = RELEASE_MODES[release_mode]
+        releases = []
+        for release in gh_repo.get_releases():
+            if release.draft:
+                continue
+            releases.append(release)
+            if limit is not None and len(releases) >= limit:
+                break
+
+        if not releases:
+            logger.info(f"No releases found for {repository.name}")
+            return
+
+        logger.info(f"Downloading {len(releases)} release(s) for {repository.name} (mode: {release_mode})")
+        releases_dir.mkdir(parents=True, exist_ok=True)
+
+        base_headers = {'User-Agent': 'GithubBackup-docker'}
+        if token:
+            base_headers['Authorization'] = f'token {token}'
+
+        for release in releases:
+            tag = release.tag_name or f"release_{release.id}"
+            release_dir = releases_dir / self._safe_filename(tag)
+            release_dir.mkdir(parents=True, exist_ok=True)
+
+            # Source code archive of the tagged commit
+            if release.zipball_url:
+                self._download_file(
+                    release.zipball_url,
+                    release_dir / f"{self._safe_filename(repo_name)}-{self._safe_filename(tag)}-source.zip",
+                    base_headers
+                )
+
+            # Uploaded release assets (binaries, packages, etc.)
+            asset_headers = dict(base_headers, Accept='application/octet-stream')
+            for asset in release.get_assets():
+                self._download_file(asset.url, release_dir / self._safe_filename(asset.name), asset_headers)
+
+            logger.info(f"Downloaded release {tag} for {repository.name}")
+
     def _cleanup_temp_directories(self, repo_backup_dir):
         """Clean up old temporary directories that might be left behind"""
         try:

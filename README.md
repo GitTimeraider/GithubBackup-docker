@@ -11,6 +11,11 @@
 <details>
   <summary>Open for sort of CHANGELOGS?</summary>
 
+**V1.03 - Releases and sorting**  
+Added the option to backup releases (meaning all files in an release). Options are None, latest release, last 5 releases or all releases
+Added simplistic search in the repositories tab
+Added sorting in repositories tab
+
 **V1.02 - cap-drop=all**  
 Added the option to make use of --cap-drop=ALL as long as you specify an user in an parameter ( --user xx:xx)
 

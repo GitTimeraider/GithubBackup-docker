@@ -20,7 +20,16 @@ if __name__ == '__main__':
         try:
             # Create tables if they don't exist
             db.create_all()
-            
+
+            # Add columns introduced after the initial schema to existing databases
+            from sqlalchemy import inspect, text
+            repo_columns = {col['name'] for col in inspect(db.engine).get_columns('repository')}
+            if 'release_mode' not in repo_columns:
+                with db.engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE repository ADD COLUMN release_mode VARCHAR(10) DEFAULT 'none'"))
+                    conn.execute(text("UPDATE repository SET release_mode = 'none' WHERE release_mode IS NULL"))
+                print("Added release_mode column to repository table")
+
             # Update existing users without theme to use dark theme
             from models import User
             users_without_theme = User.query.filter_by(theme=None).all()
