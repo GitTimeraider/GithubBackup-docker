@@ -184,7 +184,17 @@
                         </div>
                     </div>
                 </div>
-                
+
+                {% if repo.release_mode and repo.release_mode != 'none' %}
+                <p class="card-text">
+                    <small class="text-muted">
+                        <i class="fas fa-tag"></i>
+                        Releases:
+                        {% if repo.release_mode == 'latest' %}latest release{% elif repo.release_mode == 'last5' %}last 5 releases{% else %}all releases{% endif %}
+                    </small>
+                </p>
+                {% endif %}
+
                 {% if repo.last_backup %}
                 <p class="card-text">
                     <small class="text-muted">

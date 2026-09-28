@@ -4,6 +4,14 @@ from datetime import datetime
 
 db = SQLAlchemy()
 
+# Release backup modes: how many of the most recent releases to include (None = all)
+RELEASE_MODES = {
+    'none': 0,
+    'latest': 1,
+    'last5': 5,
+    'all': None,
+}
+
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -24,6 +32,7 @@ class Repository(db.Model):
     backup_format = db.Column(db.String(20), default='folder')  # folder, zip, tar.gz
     schedule_type = db.Column(db.String(20), default='daily')  # manual, hourly, daily, weekly, monthly, custom
     retention_count = db.Column(db.Integer, default=5)  # Number of backups to keep
+    release_mode = db.Column(db.String(10), default='none')  # none, latest, last5, all
     # Custom schedule fields
     custom_interval = db.Column(db.Integer)  # For custom schedule: interval value (e.g., 3 for "every 3 days")
     custom_unit = db.Column(db.String(10))   # For custom schedule: unit (days, weeks, months)

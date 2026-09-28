@@ -97,7 +97,20 @@
                             Number of backup versions to keep (older backups will be automatically deleted)
                         </div>
                     </div>
-                    
+
+                    <div class="mb-3">
+                        <label for="release_mode" class="form-label">Release Files</label>
+                        <select class="form-select" id="release_mode" name="release_mode">
+                            <option value="none" selected>Don't back up releases</option>
+                            <option value="latest">Latest release</option>
+                            <option value="last5">Last 5 releases</option>
+                            <option value="all">All releases</option>
+                        </select>
+                        <div class="form-text">
+                            Also include release assets and source archives in each backup (stored in a <code>_releases</code> folder)
+                        </div>
+                    </div>
+
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle"></i>
                         <strong>Note:</strong> 

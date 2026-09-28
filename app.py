@@ -10,7 +10,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 import logging
 from backup_service import BackupService
-from models import db, User, Repository, BackupJob, PasswordResetCode
+from models import db, User, Repository, BackupJob, PasswordResetCode, RELEASE_MODES
 import atexit
 
 # Configure logging
@@ -316,6 +316,11 @@ def ensure_scheduler_initialized():
             _scheduler_initialized = True
             logger.info("Scheduler initialization completed")
 
+def get_release_mode_from_form():
+    """Read the release backup mode from the submitted form, defaulting to no releases"""
+    release_mode = request.form.get('release_mode', 'none')
+    return release_mode if release_mode in RELEASE_MODES else 'none'
+
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
@@ -538,6 +543,7 @@ def add_repository():
             backup_format=backup_format,
             schedule_type=schedule_type,
             retention_count=retention_count,
+            release_mode=get_release_mode_from_form(),
             custom_interval=custom_interval,
             custom_unit=custom_unit,
             custom_hour=custom_hour,
@@ -566,7 +572,8 @@ def add_repositories_by_username():
         backup_format = request.form.get('backup_format', 'folder')
         schedule_type = request.form.get('schedule_type', 'daily')
         retention_count = int(request.form.get('retention_count', 5))
-        
+        release_mode = get_release_mode_from_form()
+
         if not github_username:
             flash('Please provide a GitHub username', 'error')
             return render_template('add_by_username.html')
@@ -637,6 +644,7 @@ def add_repositories_by_username():
                         backup_format=backup_format,
                         schedule_type=schedule_type,
                         retention_count=retention_count,
+                        release_mode=release_mode,
                         is_active=True
                     )
                     
@@ -714,6 +722,7 @@ def edit_repository(repo_id):
         repository.backup_format = request.form['backup_format']
         repository.schedule_type = request.form['schedule_type']
         repository.retention_count = int(request.form['retention_count'])
+        repository.release_mode = get_release_mode_from_form()
         repository.is_active = 'is_active' in request.form
         
         # Handle custom schedule fields
