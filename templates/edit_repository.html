@@ -99,7 +99,21 @@
                             </div>
                         </div>
                     </div>
-                    
+
+                    <div class="mb-3">
+                        <label for="release_mode" class="form-label">Release Files</label>
+                        {% set release_mode = repository.release_mode or 'none' %}
+                        <select class="form-select" id="release_mode" name="release_mode">
+                            <option value="none" {% if release_mode == 'none' %}selected{% endif %}>Don't back up releases</option>
+                            <option value="latest" {% if release_mode == 'latest' %}selected{% endif %}>Latest release</option>
+                            <option value="last5" {% if release_mode == 'last5' %}selected{% endif %}>Last 5 releases</option>
+                            <option value="all" {% if release_mode == 'all' %}selected{% endif %}>All releases</option>
+                        </select>
+                        <div class="form-text">
+                            Also include release assets and source archives in each backup (stored in a <code>_releases</code> folder)
+                        </div>
+                    </div>
+
                     <div class="mb-3">
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="is_active" name="is_active" 

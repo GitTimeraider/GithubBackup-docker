@@ -136,9 +136,46 @@
 </div>
 
 {% if repositories %}
-<div class="row">
+<!-- Search and sort -->
+<div class="row g-2 align-items-center mb-3">
+    <div class="col-md-7">
+        <div class="input-group">
+            <span class="input-group-text"><i class="fas fa-search"></i></span>
+            <input type="search" class="form-control" id="repoSearch"
+                   placeholder="Search by repository name or owner..." autocomplete="off">
+        </div>
+    </div>
+    <div class="col-md-5">
+        <div class="input-group">
+            <label class="input-group-text" for="repoSort"><i class="fas fa-sort"></i>&nbsp;Sort</label>
+            <select class="form-select" id="repoSort">
+                <option value="added">Date added</option>
+                <option value="name-asc">Repository name (A–Z)</option>
+                <option value="name-desc">Repository name (Z–A)</option>
+                <option value="owner-asc">Owner (A–Z)</option>
+                <option value="owner-desc">Owner (Z–A)</option>
+                <option value="backup-desc">Last backup (newest first)</option>
+                <option value="backup-asc">Last backup (oldest first)</option>
+            </select>
+        </div>
+    </div>
+    <div class="col-12">
+        <small class="text-muted" id="repoCount"></small>
+    </div>
+</div>
+
+<div class="text-center text-muted py-4" id="repoNoMatches" style="display: none;">
+    <i class="fas fa-search fa-2x mb-2"></i>
+    <p class="mb-0">No repositories match your search.</p>
+</div>
+
+<div class="row" id="repoList">
     {% for repo in repositories %}
-    <div class="col-md-6 mb-4">
+    <div class="col-md-6 mb-4 repo-item"
+         data-index="{{ loop.index0 }}"
+         data-name="{{ repo.name|lower }}"
+         data-owner="{{ repo.owner|lower }}"
+         data-last-backup="{{ repo.last_backup.isoformat() if repo.last_backup else '' }}">
         <div class="card">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start mb-3">
@@ -155,6 +192,9 @@
                 </div>
                 
                 <p class="card-text">
+                    {% if repo.owner %}
+                    <small class="text-muted"><i class="fas fa-user"></i> {{ repo.owner }}</small><br>
+                    {% endif %}
                     <small class="text-muted">{{ repo.url }}</small>
                 </p>
                 
@@ -184,7 +224,17 @@
                         </div>
                     </div>
                 </div>
-                
+
+                {% if repo.release_mode and repo.release_mode != 'none' %}
+                <p class="card-text">
+                    <small class="text-muted">
+                        <i class="fas fa-tag"></i>
+                        Releases:
+                        {% if repo.release_mode == 'latest' %}latest release{% elif repo.release_mode == 'last5' %}last 5 releases{% else %}all releases{% endif %}
+                    </small>
+                </p>
+                {% endif %}
+
                 {% if repo.last_backup %}
                 <p class="card-text">
                     <small class="text-muted">
@@ -296,6 +346,70 @@
 
 {% block scripts %}
 <script>
+    // Search and sort repositories client-side
+    (function() {
+        const list = document.getElementById('repoList');
+        if (!list) return;
+
+        const searchInput = document.getElementById('repoSearch');
+        const sortSelect = document.getElementById('repoSort');
+        const countLabel = document.getElementById('repoCount');
+        const noMatches = document.getElementById('repoNoMatches');
+        const items = Array.from(list.querySelectorAll('.repo-item'));
+        const STORAGE_KEY = 'repositories.view';
+
+        const byText = (key) => (a, b) => a.dataset[key].localeCompare(b.dataset[key]) || a.dataset.name.localeCompare(b.dataset.name);
+        const byIndex = (a, b) => Number(a.dataset.index) - Number(b.dataset.index);
+        // Repositories that were never backed up always go last
+        const byBackup = (newestFirst) => (a, b) => {
+            const x = a.dataset.lastBackup, y = b.dataset.lastBackup;
+            if (!x && !y) return a.dataset.name.localeCompare(b.dataset.name);
+            if (!x) return 1;
+            if (!y) return -1;
+            return newestFirst ? y.localeCompare(x) : x.localeCompare(y);
+        };
+        const sorters = {
+            'added': byIndex,
+            'name-asc': byText('name'),
+            'name-desc': (a, b) => byText('name')(b, a),
+            'owner-asc': byText('owner'),
+            'owner-desc': (a, b) => byText('owner')(b, a),
+            'backup-desc': byBackup(true),
+            'backup-asc': byBackup(false),
+        };
+
+        function apply() {
+            const query = searchInput.value.trim().toLowerCase();
+            let visible = 0;
+
+            items.sort(sorters[sortSelect.value] || byIndex).forEach(item => {
+                const { name, owner } = item.dataset;
+                const match = !query || name.includes(query) || owner.includes(query) || `${owner}/${name}`.includes(query);
+                item.style.display = match ? '' : 'none';
+                if (match) visible++;
+                list.appendChild(item);
+            });
+
+            countLabel.textContent = query ? `Showing ${visible} of ${items.length} repositories` : '';
+            noMatches.style.display = visible === 0 ? '' : 'none';
+
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ sort: sortSelect.value, search: searchInput.value }));
+            } catch (e) { /* storage unavailable */ }
+        }
+
+        // Restore the last used sort and search
+        try {
+            const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+            if (saved.sort && sorters[saved.sort]) sortSelect.value = saved.sort;
+            if (typeof saved.search === 'string') searchInput.value = saved.search;
+        } catch (e) { /* storage unavailable */ }
+
+        searchInput.addEventListener('input', apply);
+        sortSelect.addEventListener('change', apply);
+        apply();
+    })();
+
     // Handle backup forms via AJAX to prevent page refresh
     document.querySelectorAll('.backupForm').forEach(form => {
         form.addEventListener('submit', async (e) => {
