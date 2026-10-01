@@ -1,14 +1,13 @@
 import os
 import re
-import git
 import shutil
-import requests
 import zipfile
 import tarfile
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from github import Github
+# PyGithub and requests are imported inside the methods that use them, so the
+# idle web process doesn't keep these heavy modules (~30 MB) in memory.
 from models import db, BackupJob, RELEASE_MODES
 from urllib.parse import urlparse
 
@@ -326,6 +325,7 @@ class BackupService:
 
     def _download_file(self, url, destination, headers):
         """Stream a file from the GitHub API to disk"""
+        import requests
         with requests.get(url, headers=headers, stream=True, timeout=(30, 300), allow_redirects=True) as response:
             response.raise_for_status()
             with open(destination, 'wb') as f:
@@ -348,6 +348,7 @@ class BackupService:
         owner, repo_name = owner_repo
 
         token = repository.github_token.strip() if repository.github_token else ''
+        from github import Github
         g = Github(token) if token else Github()
         gh_repo = g.get_repo(f"{owner}/{repo_name}")
 
@@ -520,6 +521,7 @@ class BackupService:
                     if repo_name.endswith('.git'):
                         repo_name = repo_name[:-4]
 
+                    from github import Github
                     if github_token:
                         g = Github(github_token)
                     else:
