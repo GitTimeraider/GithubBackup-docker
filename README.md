@@ -5,7 +5,8 @@
 </p>
 
 ### Disclaimers: 
-#### Even though guided and checked, AI is responsible for over half of the coding. Also keep in mind that this software is mostly developed for personal use by myself and thus might not receive all feature requests desired.
+#### Even though guided and checked, AI is responsible for over half of the coding. 
+Also keep in mind that this software is mostly developed for personal use by myself and thus might not receive all feature requests desired and even be discontinued.
 ################################################################
 
 <details>
