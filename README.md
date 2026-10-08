@@ -4,10 +4,9 @@
     <img width="33%" src="https://github.com/GitTimeraider/Assets/blob/main/GithubBackup-docker/img/ghbackup_icon.png">
 </p>
 
-### Disclaimers: 
-#### Even though guided and checked, AI is responsible for over half of the coding. 
-Also keep in mind that this software is mostly developed for personal use by myself and thus might not receive all feature requests desired and even be discontinued.
-################################################################
+#### Disclaimer: 
+While guided and checked, AI is responsible for half of the coding. Development is also 100% for own personal use, no promises.
+__________________________________
 
 <details>
   <summary>Open for sort of CHANGELOGS?</summary>
