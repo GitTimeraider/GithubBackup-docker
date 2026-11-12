@@ -1,6 +1,32 @@
 {% extends "base.html" %}
 {% block page_title %}User Settings{% endblock %}
 {% block content %}
+<style>
+  .accent-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+    gap: .5rem;
+  }
+  .accent-input { position: absolute; opacity: 0; pointer-events: none; }
+  .accent-option {
+    display: flex; flex-direction: column; align-items: center; gap: .35rem;
+    padding: .55rem .25rem; border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color); background: var(--bg-tertiary);
+    cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+  }
+  .accent-option:hover { transform: translateY(-1px); }
+  .accent-swatch {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #fff; font-size: .8rem; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.15);
+  }
+  .accent-swatch i { opacity: 0; transition: opacity .15s ease; }
+  .accent-name { font-size: .75rem; font-weight: 600; color: var(--text-secondary); text-align: center; line-height: 1.1; }
+  .accent-input:checked + .accent-option { border-color: var(--primary); box-shadow: 0 0 0 .15rem rgba(var(--primary-rgb), .25); }
+  .accent-input:checked + .accent-option .accent-swatch i { opacity: 1; }
+  .accent-input:checked + .accent-option .accent-name { color: var(--text-primary); }
+  .accent-input:focus-visible + .accent-option { box-shadow: 0 0 0 .2rem rgba(var(--primary-rgb), .4); }
+</style>
 <div class="row justify-content-center">
   <div class="col-md-6">
     <div class="card mb-4">
@@ -23,6 +49,22 @@
                 <i class="fas fa-sun"></i> Light Mode
               </label>
             </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Accent Color</label>
+            <div class="accent-grid" role="radiogroup" aria-label="Accent color">
+              {% for key, c in accent_colors.items() %}
+              <input class="accent-input" type="radio" name="accent_color" id="accent_{{ key }}" value="{{ key }}"
+                     {% if current_accent == key %}checked{% endif %} onchange="switchAccent('{{ key }}')">
+              <label class="accent-option" for="accent_{{ key }}" title="{{ c.label }}">
+                <span class="accent-swatch" style="background: linear-gradient(135deg, {{ c.primary }} 0%, {{ c.primary_2 }} 100%);">
+                  <i class="fas fa-check"></i>
+                </span>
+                <span class="accent-name">{{ c.label }}</span>
+              </label>
+              {% endfor %}
+            </div>
+            <div class="form-text">Changes the highlight color used across the site.</div>
           </div>
           <button class="btn btn-primary w-100" type="submit">Save Appearance Settings</button>
         </form>
