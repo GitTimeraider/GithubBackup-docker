@@ -30,6 +30,13 @@ if __name__ == '__main__':
                     conn.execute(text("UPDATE repository SET release_mode = 'none' WHERE release_mode IS NULL"))
                 print("Added release_mode column to repository table")
 
+            user_columns = {col['name'] for col in inspect(db.engine).get_columns('user')}
+            if 'accent_color' not in user_columns:
+                with db.engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE \"user\" ADD COLUMN accent_color VARCHAR(20) DEFAULT 'purple'"))
+                    conn.execute(text("UPDATE \"user\" SET accent_color = 'purple' WHERE accent_color IS NULL"))
+                print("Added accent_color column to user table")
+
             # Update existing users without theme to use dark theme
             from models import User
             users_without_theme = User.query.filter_by(theme=None).all()

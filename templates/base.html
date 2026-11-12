@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="{% if current_user.is_authenticated %}{{ current_user.theme }}{% else %}dark{% endif %}">
+<html lang="en" data-theme="{% if current_user.is_authenticated %}{{ current_user.theme }}{% else %}dark{% endif %}" data-accent="{{ current_accent }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,15 +13,30 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bs-primary: #7c3aed;
+            --bs-primary: var(--primary);
+            --bs-primary-rgb: var(--primary-rgb);
             --primary: #7c3aed;
             --primary-2: #a855f7;
             --primary-dark: #6423c4;
+            --primary-rgb: 124, 58, 237;
+            --primary-link-dark: #a78bfa;
+            --primary-link: var(--primary);
             --primary-gradient: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%);
             --radius-sm: .5rem;
             --radius: .85rem;
             --radius-lg: 1.1rem;
         }
+
+        /* Accent colors (selectable in Settings > Appearance) */
+        {% for key, c in accent_colors.items() %}
+        [data-accent="{{ key }}"] {
+            --primary: {{ c.primary }};
+            --primary-2: {{ c.primary_2 }};
+            --primary-dark: {{ c.primary_dark }};
+            --primary-rgb: {{ c.rgb }};
+            --primary-link-dark: {{ c.link_dark }};
+        }
+        {% endfor %}
 
         /* Light theme variables */
         [data-theme="light"] {
@@ -48,6 +63,7 @@
             --border-color: #2c2938;
             --navbar-bg: var(--primary-gradient);
             --navbar-text: #ffffff;
+            --primary-link: var(--primary-link-dark);
             --card-bg: #1c1926;
             --card-shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
             --card-shadow-hover: 0 4px 10px rgba(0,0,0,0.35), 0 16px 32px -12px rgba(0,0,0,0.6);
@@ -75,7 +91,7 @@
         }
         .navbar-purple {
             background: var(--navbar-bg);
-            box-shadow: 0 4px 20px -6px rgba(124,58,237,0.45);
+            box-shadow: 0 4px 20px -6px rgba(var(--primary-rgb), 0.45);
             padding-top: .6rem;
             padding-bottom: .6rem;
         }
@@ -98,8 +114,9 @@
         }
         .navbar-purple .btn-outline-light:hover { transform: translateY(-1px); }
 
-        a { color: var(--primary); text-decoration: none; }
+        a { color: var(--primary-link); text-decoration: none; }
         a:hover { color: var(--primary-dark); }
+        [data-theme="dark"] a:hover { color: var(--primary-2); }
 
         /* Buttons */
         .btn {
@@ -115,16 +132,16 @@
         .btn-primary {
             background: var(--primary-gradient);
             border-color: transparent;
-            box-shadow: 0 4px 14px -4px rgba(124,58,237,0.55);
+            box-shadow: 0 4px 14px -4px rgba(var(--primary-rgb), 0.55);
         }
         .btn-primary:hover, .btn-primary:focus {
             background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
             border-color: transparent;
-            box-shadow: 0 6px 18px -4px rgba(124,58,237,0.65);
+            box-shadow: 0 6px 18px -4px rgba(var(--primary-rgb), 0.65);
         }
 
         .btn-outline-primary {
-            color: var(--primary);
+            color: var(--primary-link);
             border-color: var(--primary);
         }
         .btn-outline-primary:hover {
@@ -213,7 +230,7 @@
             background: var(--bg-primary);
             border-color: var(--primary);
             color: var(--text-primary);
-            box-shadow: 0 0 0 0.2rem rgba(124, 58, 237, 0.2);
+            box-shadow: 0 0 0 0.2rem rgba(var(--primary-rgb), 0.2);
         }
 
         .form-control::placeholder {
@@ -229,7 +246,7 @@
             border-color: var(--primary);
         }
         .form-check-input:focus {
-            box-shadow: 0 0 0 0.2rem rgba(124, 58, 237, 0.2);
+            box-shadow: 0 0 0 0.2rem rgba(var(--primary-rgb), 0.2);
         }
 
         /* Tables */
@@ -262,7 +279,7 @@
         }
         .table-hover tbody tr:hover,
         .table tbody tr:hover {
-            background-color: rgba(124, 58, 237, 0.06);
+            background-color: rgba(var(--primary-rgb), 0.06);
         }
 
         /* Force all text in tables to use proper colors */
@@ -392,6 +409,7 @@
         }
         .progress-bar {
             transition: width .4s ease;
+            background-color: var(--primary);
         }
 
         main { padding: 1.25rem 1.25rem 3rem; max-width: 1320px; margin: 0 auto; }
@@ -415,7 +433,7 @@
             font-size: 0.85rem;
         }
         .footer-bar a {
-            color: var(--primary);
+            color: var(--primary-link);
             text-decoration: none;
             font-weight: 600;
         }
@@ -484,6 +502,21 @@
                     },
                     body: JSON.stringify({ theme: theme })
                 }).catch(err => console.log('Theme save failed:', err));
+            }
+        }
+
+        // Accent color switching functionality
+        function switchAccent(accent) {
+            document.documentElement.setAttribute('data-accent', accent);
+
+            if (typeof fetch !== 'undefined') {
+                fetch('/api/theme', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ accent_color: accent })
+                }).catch(err => console.log('Accent save failed:', err));
             }
         }
     </script>

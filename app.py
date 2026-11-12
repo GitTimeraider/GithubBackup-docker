@@ -10,7 +10,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 import logging
 from backup_service import BackupService
-from models import db, User, Repository, BackupJob, PasswordResetCode, RELEASE_MODES
+from models import db, User, Repository, BackupJob, PasswordResetCode, RELEASE_MODES, ACCENT_COLORS, DEFAULT_ACCENT
 import atexit
 
 # Configure logging
@@ -134,6 +134,14 @@ with app.app_context():
         logger.info('Initial DB connectivity test succeeded.')
     except Exception as e:
         logger.error(f'Initial DB connectivity test failed: {e}')
+
+@app.context_processor
+def inject_accent_colors():
+    accent = DEFAULT_ACCENT
+    if current_user.is_authenticated and getattr(current_user, 'accent_color', None) in ACCENT_COLORS:
+        accent = current_user.accent_color
+    return {'accent_colors': ACCENT_COLORS, 'current_accent': accent}
+
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -367,6 +375,9 @@ def user_settings():
         theme = request.form.get('theme')
         if theme in ['dark', 'light']:
             current_user.theme = theme
+            accent = request.form.get('accent_color')
+            if accent in ACCENT_COLORS:
+                current_user.accent_color = accent
             flash('Appearance settings updated', 'success')
             db.session.commit()
             return redirect(url_for('user_settings'))
@@ -963,15 +974,23 @@ def test_scheduled_backup(repo_id):
 @app.route('/api/theme', methods=['POST'])
 @login_required
 def update_theme():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     theme = data.get('theme')
-    
-    if theme in ['dark', 'light']:
+    accent = data.get('accent_color')
+
+    if theme is None and accent is None:
+        return jsonify({'success': False, 'error': 'Nothing to update'}), 400
+    if theme is not None and theme not in ['dark', 'light']:
+        return jsonify({'success': False, 'error': 'Invalid theme'}), 400
+    if accent is not None and accent not in ACCENT_COLORS:
+        return jsonify({'success': False, 'error': 'Invalid accent color'}), 400
+
+    if theme is not None:
         current_user.theme = theme
-        db.session.commit()
-        return jsonify({'success': True, 'theme': theme})
-    
-    return jsonify({'success': False, 'error': 'Invalid theme'}), 400
+    if accent is not None:
+        current_user.accent_color = accent
+    db.session.commit()
+    return jsonify({'success': True, 'theme': current_user.theme, 'accent_color': current_user.accent_color})
 
 @app.route('/favicon.ico')
 def favicon():
